@@ -173,12 +173,12 @@ class FixedSizeDust(DustyDisc):
         eps      : Initial dust fraction (must broadcast to [size.shape, Ncell])
         size     : size, cm (float or 1-d array of sizes)
         Sigma    : Initial surface density distribution
-        rhos     : solid density, default=1 g / cm^3
+        rho_s    : solid density, default=1 g / cm^3
+        Sc       : Schmidt number, default=1
         feedback : default=True
     """
-    def __init__(self, grid, star, eos, eps, size, Sigma=None, rhos=1, feedback=True):
-
-        super(FixedSizeDust, self).__init__(grid, star, eos, Sigma, rhos, feedback)
+    def __init__(self, grid, star, eos, eps, size, Sigma=None, rho_s=1., Sc=1., feedback=True):
+        super(FixedSizeDust, self).__init__(grid, star, eos, Sigma=Sigma, rho_s=rho_s, Sc=Sc, feedback=feedback)
 
         shape = np.atleast_1d(size).shape + (self.Ncells,)
         self._eps  = np.empty(shape, dtype='f8')
