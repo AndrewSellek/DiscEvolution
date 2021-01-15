@@ -554,7 +554,7 @@ class SingleFluidDrift(object):
         Om_kav  = 0.5*(Om_k      [1:] + Om_k      [:-1])
         Sig_av  = 0.5*(Sigma     [1:] + Sigma     [:-1]) + 1e-300
         SigD_av = 0.5*(SigmaD[...,1:] + SigmaD[...,:-1])
-        SigG_av = 0.5*(SigmaG[...,1:] + SigmaG[...,:-1])
+        SigG_av = 0.5*(SigmaG[...,1:] + SigmaG[...,:-1]) + 1e-300
         a_av    = 0.5*(a    [..., 1:] + a     [...,:-1])
         R_av    = 0.5*(R         [1:] + R         [:-1])
 
@@ -608,7 +608,7 @@ class SingleFluidDrift(object):
         if v_visc is not None:
             u_gas += (1 + la0) * v_visc * D_1 / eps_g
             v_gas += 0.5 * la1 * v_visc * D_1 / eps_g
-
+        
         # Dust-gas relative velocities:
         DeltaV = (2*v_gas / (St_av + St_av**-1) 
                   - u_gas / (1     + St_av**-2))
