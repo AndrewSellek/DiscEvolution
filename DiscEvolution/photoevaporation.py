@@ -205,8 +205,9 @@ class FixedExternalEvaporation(ExternalPhotoevaporationBase):
         amax : maximum grain size entrained, default = 10 micron
     """
 
-    def __init__(self, disc, Mdot=1e-8, amax=10):
+    def __init__(self, disc, Mdot=1e-8, tshield=0, amax=10):
         self._Mdot = Mdot
+        self._tshield = tshield * yr
         self._amax = amax * np.ones_like(disc.R)
         self._empty = False
 
@@ -268,40 +269,62 @@ class TimeExternalEvaporation(ExternalPhotoevaporationBase):
         return self.__class__.__name__, header
 
 ###### FRIED Variants
-
-class FRIEDExternalEvaporationS(ExternalPhotoevaporationBase):
-    """External photoevaporation flow with a mass loss rate which
-    is dependent on radius and surface density.
+class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
+    """
+    General FRIED Implementation
+    Implementations of this must specify which function from photorate to use.
+    They must also set self._density depending on whether the interpolation over the FRIED grid is over a function of the surface densty (True) or total mass (False).
 
     args:
         Mdot : mass-loss rate in Msun / yr,  default = 10^-10
         amax : maximum grain size entrained, default = 0
+        FUV  : The irradiating FUV field in Habing unit (G0), default = 0
+        tshield : A delay to the onset of photoevaporation in yr (in development)
     """
 
-    def __init__(self, disc, Mdot=1e-10, amax=0):
-        self.FRIED_Rates = photorate.FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,disc.star.M,disc.FUV)
-        self._Mdot = 0
-        self._amax = amax * np.ones_like(disc.R)
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
+        self._Mdot = 0.0
+        self._tshield = tshield * yr
+        self._amax = amax * np.zeros_like(disc.R)
         self._FUV = disc.FUV
         self._Rot = max(disc.R)
-        self._density = True
 
-        self._Mcum_gas  = 0.0
-        self._Mcum_dust = 0.0
+        self._Mcum_gas  = Mcum_gas
+        self._Mcum_dust = Mcum_dust
 
     def __call__(self, disc, dt):
-        self.weighted_removal(disc, dt) # For FRIED mass loss rates calculated with density, need to use optical depth method
+        if self._density:    # For FRIED mass loss rates calculated with density, need to use optical depth method
+            self.weighted_removal(disc, dt)
+        else:                # For FRIED mass loss rates calculated with total mass, can use timescale method (doesn't account for dust)
+            self.timescale_remove(disc, dt)
 
     def mass_loss_rate(self, disc, not_empty):
         calc_rates = np.zeros_like(disc.R)
-        calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( disc.Sigma_G[not_empty], disc.R[not_empty] ))
+        if self._density:    # For FRIED mass loss rates calculated with density, calculate directly
+            calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( disc.Sigma_G[not_empty], disc.R[not_empty] ))
+        else:                # For FRIED mass loss rates calculated with total mass, first calculate the cumulative mass
+            Re = disc.R_edge * AU
+            dA = np.pi * (Re[1:] ** 2 - Re[:-1] ** 2)
+            dM_gas = disc.Sigma_G * dA
+            integ_mass = np.cumsum(dM_gas)/ Mjup
+            calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( integ_mass[not_empty], disc.R[not_empty] ))
         norate = np.isnan(calc_rates)
         calc_rates[norate] = 1e-10
         return calc_rates
-        
+
     def max_size_entrained(self, disc):
-        self._amax = Facchini_limit(disc,self._Mdot) # Update maximum entrained size
+        # Update maximum entrained size
+        self._amax = Facchini_limit(disc,self._Mdot)
         return self._amax
+
+class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
+    """External photoevaporation flow with a mass loss rate which is dependent on radius and surface density.
+    """
+
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
+        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+        self.FRIED_Rates = photorate.FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self._density = True
 
     def ASCII_header(self):
         return ("# FRIEDExternalEvaporationS: {} G0".format(self._FUV))
@@ -310,40 +333,16 @@ class FRIEDExternalEvaporationS(ExternalPhotoevaporationBase):
         header = {}
         return self.__class__.__name__, header
 
-class FRIEDExternalEvaporationMS(ExternalPhotoevaporationBase):
-    """External photoevaporation flow with a mass loss rate which
-    is dependent on radius and surface density.
+class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
+    """
+    External photoevaporation flow with a mass loss rate which is dependent on radius and surface density.
     Calculated by converting to the mass within 400 AU (M400 ~ R Sigma)
-
-    args:
-        Mdot : mass-loss rate in Msun / yr,  default = 10^-10
-        amax : maximum grain size entrained, default = 0
     """
 
-    def __init__(self, disc, Mdot=1e-10, amax=0):
-        self.FRIED_Rates = photorate.FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,disc.FUV)
-        self._Mdot = 0
-        self._amax = amax * np.ones_like(disc.R)
-        self._FUV = disc.FUV
-        self._Rot = max(disc.R)
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
+        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+        self.FRIED_Rates = photorate.FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
-
-        self._Mcum_gas  = 0.0
-        self._Mcum_dust = 0.0
-
-    def __call__(self, disc, dt):
-        self.weighted_removal(disc, dt) # For FRIED mass loss rates calculated with density, need to use optical depth method
-
-    def mass_loss_rate(self, disc, not_empty):
-        calc_rates = np.zeros_like(disc.R)
-        calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( disc.Sigma_G[not_empty], disc.R[not_empty] ))
-        norate = np.isnan(calc_rates)
-        calc_rates[norate] = 1e-10
-        return calc_rates
-
-    def max_size_entrained(self, disc):
-        self._amax = Facchini_limit(disc,self._Mdot) # Update maximum entrained size
-        return self._amax
 
     def ASCII_header(self):
         return ("# FRIEDExternalEvaporationMS: {} G0".format(self._FUV))
@@ -352,43 +351,16 @@ class FRIEDExternalEvaporationMS(ExternalPhotoevaporationBase):
         header = {}
         return self.__class__.__name__, header
 
-class FRIEDExternalEvaporationM(ExternalPhotoevaporationBase):
-    """External photoevaporation flow with a mass loss rate which
-    is dependent on radius and integrated mass interior.
+class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
+    """
+    External photoevaporation flow with a mass loss rate which is dependent on radius and integrated mass interior.
     Calculated by converting to the mass within 400 AU (M400 ~ M / R)
-
-    args:
-        Mdot : mass-loss rate in Msun / yr,  default = 10^-10
-        amax : maximum grain size entrained, default = 0
     """
 
-    def __init__(self, disc, Mdot=1e-10, amax=0):
-        self.FRIED_Rates = photorate.FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,disc.star.M,disc.FUV)
-        self._Mdot = 0
-        self._amax = amax * np.ones_like(disc.R)
-        self._FUV = disc.FUV
-        self._Rot = max(disc.R)
-
-        self._Mcum_gas  = 0.0
-        self._Mcum_dust = 0.0
-
-    def __call__(self, disc, dt):
-        self.timescale_remove(disc, dt) # For FRIED mass loss rates calculated with total mass, can use timescale method (doesn't account for dust)
-
-    def mass_loss_rate(self, disc, not_empty):
-        Re = disc.R_edge * AU
-        dA = np.pi * (Re[1:] ** 2 - Re[:-1] ** 2)
-        dM_gas = disc.Sigma_G * dA
-        integ_mass = np.cumsum(dM_gas)/ Mjup
-        calc_rates = np.zeros_like(disc.R)
-        calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( integ_mass[not_empty], disc.R[not_empty] ))
-        norate = np.isnan(calc_rates)
-        calc_rates[norate] = 1e-10
-        return calc_rates
-
-    def max_size_entrained(self, disc):
-        self._amax = Facchini_limit(disc,self._Mdot) # Update maximum entrained size
-        return self._amax
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
+        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+        self.FRIED_Rates = photorate.FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self._density = False
 
     def ASCII_header(self):
         return ("# FRIEDExternalEvaporationM: {} G0".format(self._FUV))

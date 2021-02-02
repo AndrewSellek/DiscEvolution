@@ -71,7 +71,7 @@ class History(object):
             return self._Mdust, self._Mcum_dust
         else:
             print("No dust masses to return")
-            return None
+            return [0], [0]
 
     @property
     def mdot(self):
@@ -121,7 +121,7 @@ class History(object):
         except ValueError:
             pass
         try:
-            self._Mcum_gas = restartdata['M_wg']
+            self._Mcum_gas = restartdata['M_extg']
         except ValueError:
             pass
 
@@ -137,7 +137,7 @@ class History(object):
             except ValueError:
                 pass
             try:
-                self._Mcum_dust = restartdata['M_wd']
+                self._Mcum_dust = restartdata['M_extd']
             except ValueError:
                 pass
 

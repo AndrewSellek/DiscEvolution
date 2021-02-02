@@ -163,14 +163,24 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         p = model['fuv']
     except KeyError:
         p = model['uv']
+    if start_time>0:
+        _, Mcum_gas  = history.mass
+        _, Mcum_dust = history.mass_dust
+        Mcum_gas  = Mcum_gas[-1]
+        Mcum_dust = Mcum_dust[-1]
+    else:
+        Mcum_gas  = 0.0
+        Mcum_dust = 0.0
     if (p['photoevaporation'] == "Constant"):
-        photoevap = photoevaporation.FixedExternalEvaporation(disc, Mdot=1e-9)
+        photoevap = photoevaporation.FixedExternalEvaporation(disc, 1e-9)
     elif (p['photoevaporation'] == "FRIED" and disc.FUV>0):
-        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc) # Using 2DMS at 400
+        # Using 2DMS at 400 au
+        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
     elif (p['photoevaporation'] == "FRIED" and disc.FUV<=0):
         photoevap = None
     elif (p['photoevaporation'] == "Integrated"):
-        photoevap = photoevaporation.FRIEDExternalEvaporationM(disc) # Using integrated M(<R), extrapolated to M400
+        # Using integrated M(<R), extrapolated to M400
+        photoevap = photoevaporation.FRIEDExternalEvaporationM(disc, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
     elif (p['photoevaporation'] == "None"):
         photoevap = None
     else:
@@ -324,6 +334,7 @@ def setup_wrapper(model, restart, output=True):
 
     # Truncate disc at base of wind
     if driver.photoevaporation_external and not restart:
+        print("Truncate initial disc")
         if (isinstance(driver.photoevaporation_external,photoevaporation.FRIEDExternalEvaporationMS)):
             driver.photoevaporation_external.optically_thin_weighting(disc)
             optically_thin = (disc.R > driver.photoevaporation_external._Rot)
