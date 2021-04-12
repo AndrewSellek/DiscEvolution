@@ -120,7 +120,8 @@ class DiscEvolutionDriver(object):
 
         # Do external photoevaporation
         if self._external_photo:
-            self._external_photo(disc, dt)
+            if self.t>=self._external_photo._tshield:
+                self._external_photo(disc, dt)
 
         # Do internal photoevaporation
         if self._internal_photo:

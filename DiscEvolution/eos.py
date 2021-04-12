@@ -24,8 +24,8 @@ class EOS_Table(object):
         R  = self._R
         self._cs     = self._f_cs(R)
         self._H      = self._f_H(R)
-        self._nu     = self._f_nu(R)
         self._alpha  = self._f_alpha(R)
+        self._nu     = self._f_nu(R)
 
     @property
     def cs(self):
@@ -77,16 +77,17 @@ class LocallyIsothermalEOS(EOS_Table):
         star    : stellar properties
         mu      : mean molecular weight, default=2.4
     """
-    def __init__(self, star, h0, q, alpha_t, mu=2.4):
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, RDZ=None):
         super(LocallyIsothermalEOS, self).__init__()
         
         self._h0 = h0
         self._cs0 = h0 * star.M**0.5
         self._q = q
-        self._alpha_t = alpha_t
         self._H0 = h0
         self._T0 = (AU*Omega0)**2 * mu / GasConst
         self._mu = mu
+        self._alpha_t = alpha_t
+        self._RDZ = RDZ
         
     def _f_cs(self, R):
         return self._cs0 * R**self._q
@@ -95,10 +96,27 @@ class LocallyIsothermalEOS(EOS_Table):
         return self._H0 * R**(1.5+self._q)
     
     def _f_nu(self, R):
-        return self._alpha_t * self._f_cs(R) * self._f_H(R)
+        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R)
 
     def _f_alpha(self, R):
-        return self._alpha_t
+        if not self._RDZ:
+            # When no change in alpha ("dead zone") return single value
+            if type(self._alpha_t) is list:
+                if len(self._alpha_t)>1:
+                    print("Only one value of alpha needed. Using {} and ignoring {}.".format(self._alpha_t[0], self._alpha_t[1:]))
+                return self._alpha_t[0]
+            else:
+                print(type(self._alpha_t))
+                return self._alpha_t
+        else:
+            # Break into regions of different alpha
+            assert len(self._alpha_t) - len(self._RDZ) == 1, "Need to specify one fewer radius than alpha value."
+            
+            RDZ = [0]+self._RDZ+[np.inf]
+            alpha = np.zeros_like(R)
+            for r in range(0, len(self._alpha_t)):
+                alpha += self._alpha_t[r] * (R > RDZ[r]) * (R <= RDZ[r+1])
+            return alpha
 
     @property
     def T(self):

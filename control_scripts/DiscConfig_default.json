@@ -54,7 +54,8 @@
 
 "fuv" : {
 "photoevaporation" : "None",
-"fuv_field" : 0
+"fuv_field" : 0,
+"t_shield" : -1
 },
 
 "dust" : {

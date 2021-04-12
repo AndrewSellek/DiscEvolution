@@ -74,13 +74,17 @@ def setup_disc(model):
         mu = p['mu']
     except KeyError:
         mu = 2.4
+    try:
+        RDZ = model['disc']['RDZ']
+    except KeyError:
+        RDZ = None
     if p['type'] == 'irradiated':
         assert p['opacity'] == 'Tazzari2016'
         kappa = Tazzari2016()
-        eos = IrradiatedEOS(star, model['disc']['alpha'], kappa=kappa, mu=mu)
+        eos = IrradiatedEOS(star, model['disc']['alpha'], kappa=kappa, mu=mu, RDZ=RDZ)
     elif p['type'] == 'iso':
         eos = LocallyIsothermalEOS(star, p['h0'], p['q'], 
-                                   model['disc']['alpha'], mu=mu)
+                                   model['disc']['alpha'], mu=mu, RDZ=RDZ)
     else:
         raise ValueError("Error: eos::type not recognised")
     eos.set_grid(grid)
@@ -163,6 +167,10 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         p = model['fuv']
     except KeyError:
         p = model['uv']
+    try:
+        tshield = p['t_shield']
+    except:
+        tshield = 0
     if start_time>0:
         _, Mcum_gas  = history.mass
         _, Mcum_dust = history.mass_dust
@@ -172,15 +180,15 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         Mcum_gas  = 0.0
         Mcum_dust = 0.0
     if (p['photoevaporation'] == "Constant"):
-        photoevap = photoevaporation.FixedExternalEvaporation(disc, 1e-9)
+        photoevap = photoevaporation.FixedExternalEvaporation(disc, 1e-9, tshield)
     elif (p['photoevaporation'] == "FRIED" and disc.FUV>0):
         # Using 2DMS at 400 au
-        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc, tshield=tshield, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
     elif (p['photoevaporation'] == "FRIED" and disc.FUV<=0):
         photoevap = None
     elif (p['photoevaporation'] == "Integrated"):
         # Using integrated M(<R), extrapolated to M400
-        photoevap = photoevaporation.FRIEDExternalEvaporationM(disc, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+        photoevap = photoevaporation.FRIEDExternalEvaporationM(disc, tshield=tshield, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
     elif (p['photoevaporation'] == "None"):
         photoevap = None
     else:
@@ -333,7 +341,7 @@ def setup_wrapper(model, restart, output=True):
         output_name, io_control, plot_name = None, None, None
 
     # Truncate disc at base of wind
-    if driver.photoevaporation_external and not restart:
+    if driver.photoevaporation_external and not restart and driver.photoevaporation_external._tshield<0:
         print("Truncate initial disc")
         if (isinstance(driver.photoevaporation_external,photoevaporation.FRIEDExternalEvaporationMS)):
             driver.photoevaporation_external.optically_thin_weighting(disc)
@@ -415,6 +423,7 @@ def run(model, io, base_name, all_in, restart, verbose=True, n_print=1000, end_l
     hole_switch = False
 
     if restart:
+        save_no = restart+1
         # Skip evolution already completed
         while not io.finished():
             ti = io.next_event_time()
