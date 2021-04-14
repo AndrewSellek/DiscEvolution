@@ -75,16 +75,21 @@ def setup_disc(model):
     except KeyError:
         mu = 2.4
     try:
-        RDZ = model['disc']['RDZ']
+        R_alpha = model['disc']['Ra']
     except KeyError:
-        RDZ = None
+        try:
+            R_alpha = model['disc']['RDZ']
+        except KeyError:
+            R_alpha = None
+    if R_alpha:
+        assert len(model['disc']['alpha']) - len(R_alpha) == 1, "Need to specify one fewer radius than alpha value."
     if p['type'] == 'irradiated':
         assert p['opacity'] == 'Tazzari2016'
         kappa = Tazzari2016()
-        eos = IrradiatedEOS(star, model['disc']['alpha'], kappa=kappa, mu=mu, RDZ=RDZ)
+        eos = IrradiatedEOS(star, model['disc']['alpha'], kappa=kappa, mu=mu)
     elif p['type'] == 'iso':
         eos = LocallyIsothermalEOS(star, p['h0'], p['q'], 
-                                   model['disc']['alpha'], mu=mu, RDZ=RDZ)
+                                   model['disc']['alpha'], mu=mu, R_alpha=R_alpha)
     else:
         raise ValueError("Error: eos::type not recognised")
     eos.set_grid(grid)

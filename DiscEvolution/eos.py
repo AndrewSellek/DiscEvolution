@@ -77,7 +77,7 @@ class LocallyIsothermalEOS(EOS_Table):
         star    : stellar properties
         mu      : mean molecular weight, default=2.4
     """
-    def __init__(self, star, h0, q, alpha_t, mu=2.4, RDZ=None):
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, R_alpha=None, w=1.0):
         super(LocallyIsothermalEOS, self).__init__()
         
         self._h0 = h0
@@ -87,7 +87,8 @@ class LocallyIsothermalEOS(EOS_Table):
         self._T0 = (AU*Omega0)**2 * mu / GasConst
         self._mu = mu
         self._alpha_t = alpha_t
-        self._RDZ = RDZ
+        self._R_alpha = R_alpha
+        self._R_alpha_w = w
         
     def _f_cs(self, R):
         return self._cs0 * R**self._q
@@ -99,24 +100,22 @@ class LocallyIsothermalEOS(EOS_Table):
         return self._f_alpha(R) * self._f_cs(R) * self._f_H(R)
 
     def _f_alpha(self, R):
-        if not self._RDZ:
-            # When no change in alpha ("dead zone") return single value
+        if not self._R_alpha:
+            # When no change in alpha return single value
             if type(self._alpha_t) is list:
                 if len(self._alpha_t)>1:
                     print("Only one value of alpha needed. Using {} and ignoring {}.".format(self._alpha_t[0], self._alpha_t[1:]))
                 return self._alpha_t[0]
             else:
-                print(type(self._alpha_t))
                 return self._alpha_t
         else:
             # Break into regions of different alpha
-            assert len(self._alpha_t) - len(self._RDZ) == 1, "Need to specify one fewer radius than alpha value."
-            
-            RDZ = [0]+self._RDZ+[np.inf]
-            alpha = np.zeros_like(R)
-            for r in range(0, len(self._alpha_t)):
-                alpha += self._alpha_t[r] * (R > RDZ[r]) * (R <= RDZ[r+1])
-            return alpha
+            logalpha = np.full_like(R, np.log(self._alpha_t[0]))
+            for r in range(0, len(self._R_alpha)):
+                ka = np.log(self._alpha_t[r+1]/self._alpha_t[r])
+                Ha = self.H[np.argmin(np.abs(R-self._R_alpha[r]))]
+                logalpha += ka * 0.5 * (1 + np.tanh( (R-self._R_alpha[r]) / (self._R_alpha_w*Ha) ))
+            return np.exp(logalpha)
 
     @property
     def T(self):
@@ -167,7 +166,7 @@ class IrradiatedEOS(EOS_Table):
     """
     def __init__(self, star, alpha_t, Tc=10, Tmax=1500., mu=2.4, gamma=1.4,
                  kappa=None,
-                 accrete=True, tol=None): # tol is no longer used
+                 accrete=True, tol=None, R_alpha=None, w=1.0): # tol is no longer used
         super(IrradiatedEOS, self).__init__()
 
         self._star = star
@@ -175,6 +174,8 @@ class IrradiatedEOS(EOS_Table):
         self._dlogHdlogRm1 = 2/7.
 
         self._alpha_t = alpha_t
+        self._R_alpha = R_alpha
+        self._R_alpha_w = w
         
         self._Tc = Tc
         self._Tmax = Tmax
@@ -290,10 +291,25 @@ class IrradiatedEOS(EOS_Table):
         return self.__H(R, self._T)
     
     def _f_nu(self, R):
-        return self._alpha_t * self._f_cs(R) * self._f_H(R)
+        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R)
 
     def _f_alpha(self, R):
-        return self._alpha_t
+        if not self._R_alpha:
+            # When no change in alpha return single value
+            if type(self._alpha_t) is list:
+                if len(self._alpha_t)>1:
+                    print("Only one value of alpha needed. Using {} and ignoring {}.".format(self._alpha_t[0], self._alpha_t[1:]))
+                return self._alpha_t[0]
+            else:
+                return self._alpha_t
+        else:
+            # Break into regions of different alpha
+            logalpha = np.full_like(R, np.log(self._alpha_t[0]))
+            for r in range(0, len(self._R_alpha)):
+                ka = np.log(self._alpha_t[r+1]/self._alpha_t[r])
+                Ha = self.H[np.argmin(np.abs(R-self._R_alpha[r]))]
+                logalpha += ka * 0.5 * (1 + np.tanh( (R-self._R_alpha[r]) / (self._R_alpha_w*Ha) ))
+            return np.exp(logalpha)
 
     def _f_Pr(self):
         kappa = self._kappa_arr
