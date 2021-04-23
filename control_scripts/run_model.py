@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from DiscEvolution.constants import Msun, AU, yr, Mjup
 from DiscEvolution.grid import Grid
 from DiscEvolution.star import SimpleStar, PhotoStar
-from DiscEvolution.eos  import IrradiatedEOS, LocallyIsothermalEOS
+from DiscEvolution.eos  import IrradiatedEOS, LocallyIsothermalEOS, TanhAlphaEOS
 from DiscEvolution.dust import DustGrowthTwoPop
 from DiscEvolution.opacity import Tazzari2016
 from DiscEvolution.viscous_evolution import ViscousEvolution, ViscousEvolutionFV
@@ -88,8 +88,12 @@ def setup_disc(model):
         kappa = Tazzari2016()
         eos = IrradiatedEOS(star, model['disc']['alpha'], kappa=kappa, mu=mu)
     elif p['type'] == 'iso':
-        eos = LocallyIsothermalEOS(star, p['h0'], p['q'], 
+        if R_alpha:
+            eos = TanhAlphaEOS(star, p['h0'], p['q'], 
                                    model['disc']['alpha'], mu=mu, R_alpha=R_alpha)
+        else:
+            eos = LocallyIsothermalEOS(star, p['h0'], p['q'], 
+                                   model['disc']['alpha'], mu=mu)
     else:
         raise ValueError("Error: eos::type not recognised")
     eos.set_grid(grid)

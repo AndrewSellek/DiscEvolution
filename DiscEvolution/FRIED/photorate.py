@@ -238,6 +238,6 @@ if __name__ == "__main__":
     parser.add_argument("--FUV", "-u", type=float, default=1000)
     args = parser.parse_args()
 
-    D2_space(interp_type='400', extrapolate=True, UV=args.FUV)
+    D2_space(interp_type='400', extrapolate=True, UV=args.FUV, markers=True)
 
 

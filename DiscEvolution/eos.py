@@ -77,7 +77,7 @@ class LocallyIsothermalEOS(EOS_Table):
         star    : stellar properties
         mu      : mean molecular weight, default=2.4
     """
-    def __init__(self, star, h0, q, alpha_t, mu=2.4, R_alpha=None, w=1.0):
+    def __init__(self, star, h0, q, alpha_t, mu=2.4):
         super(LocallyIsothermalEOS, self).__init__()
         
         self._h0 = h0
@@ -87,8 +87,6 @@ class LocallyIsothermalEOS(EOS_Table):
         self._T0 = (AU*Omega0)**2 * mu / GasConst
         self._mu = mu
         self._alpha_t = alpha_t
-        self._R_alpha = R_alpha
-        self._R_alpha_w = w
         
     def _f_cs(self, R):
         return self._cs0 * R**self._q
@@ -100,22 +98,14 @@ class LocallyIsothermalEOS(EOS_Table):
         return self._f_alpha(R) * self._f_cs(R) * self._f_H(R)
 
     def _f_alpha(self, R):
-        if not self._R_alpha:
-            # When no change in alpha return single value
-            if type(self._alpha_t) is list:
-                if len(self._alpha_t)>1:
-                    print("Only one value of alpha needed. Using {} and ignoring {}.".format(self._alpha_t[0], self._alpha_t[1:]))
-                return self._alpha_t[0]
-            else:
-                return self._alpha_t
+        """Handle being passed a list of alphas
+        Since no change in alpha return single value"""
+        if type(self._alpha_t) is list:
+            if len(self._alpha_t)>1:
+                print("Only one value of alpha needed. Using {} and ignoring {}.".format(self._alpha_t[0], self._alpha_t[1:]))
+            return self._alpha_t[0]
         else:
-            # Break into regions of different alpha
-            logalpha = np.full_like(R, np.log(self._alpha_t[0]))
-            for r in range(0, len(self._R_alpha)):
-                ka = np.log(self._alpha_t[r+1]/self._alpha_t[r])
-                Ha = self.H[np.argmin(np.abs(R-self._R_alpha[r]))]
-                logalpha += ka * 0.5 * (1 + np.tanh( (R-self._R_alpha[r]) / (self._R_alpha_w*Ha) ))
-            return np.exp(logalpha)
+            return self._alpha_t
 
     @property
     def T(self):
@@ -147,6 +137,41 @@ class LocallyIsothermalEOS(EOS_Table):
     def star(self):
         return self._star
 
+class TanhAlphaEOS(LocallyIsothermalEOS):
+    """Variant that allows for smooth (tanh) changes in alpha"""
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, R_alpha=None, w=1.0, t_trap=-np.inf):
+        super(TanhAlphaEOS, self).__init__(star, h0, q, alpha_t, mu=2.4)
+        
+        self._R_alpha = R_alpha
+        self._R_alpha_w = w
+        self._t_trap = t_trap
+
+    def _f_nu(self, R, t=0):
+        return self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R)
+
+    def _f_alpha(self, R, t=0):
+        if self._R_alpha:
+            # Break into regions of different alpha
+            logalpha = np.full_like(R, np.log(self._alpha_t[0]))
+            for r in range(0, len(self._R_alpha)):
+                ka = np.log(self._alpha_t[r+1]/self._alpha_t[r])
+                Ha = self.H[np.argmin(np.abs(R-self._R_alpha[r]))]
+                logalpha += ka * self.smooth_step(R, self._R_alpha[r], self._R_alpha_w*Ha) * self.smooth_step(t, self._t_trap, max(1e-300,self._t_trap/10))
+            return np.exp(logalpha)
+        else:
+            super(VariableAlphaEOS, self)._f_alpha(R)
+
+    def update(self, dt, Sigma, amax=None, star=None):
+        """Update the eos"""
+        if dt>0 and self._t_trap>0:
+            self._alpha  = self._f_alpha(self._R, t = star.age)
+            self._nu     = self._f_nu(self._R, t = star.age)
+        else:
+            pass
+
+    def smooth_step(self, x, center=0, width=1):
+        return 0.5 * (1 + np.tanh((x-center)/width))
+
 _sqrt2pi = np.sqrt(2*np.pi)
 class IrradiatedEOS(EOS_Table):
     """Model for an active irradiated disc.
@@ -166,7 +191,7 @@ class IrradiatedEOS(EOS_Table):
     """
     def __init__(self, star, alpha_t, Tc=10, Tmax=1500., mu=2.4, gamma=1.4,
                  kappa=None,
-                 accrete=True, tol=None, R_alpha=None, w=1.0): # tol is no longer used
+                 accrete=True, tol=None): # tol is no longer used
         super(IrradiatedEOS, self).__init__()
 
         self._star = star
@@ -174,8 +199,6 @@ class IrradiatedEOS(EOS_Table):
         self._dlogHdlogRm1 = 2/7.
 
         self._alpha_t = alpha_t
-        self._R_alpha = R_alpha
-        self._R_alpha_w = w
         
         self._Tc = Tc
         self._Tmax = Tmax
@@ -294,22 +317,14 @@ class IrradiatedEOS(EOS_Table):
         return self._f_alpha(R) * self._f_cs(R) * self._f_H(R)
 
     def _f_alpha(self, R):
-        if not self._R_alpha:
-            # When no change in alpha return single value
-            if type(self._alpha_t) is list:
-                if len(self._alpha_t)>1:
-                    print("Only one value of alpha needed. Using {} and ignoring {}.".format(self._alpha_t[0], self._alpha_t[1:]))
-                return self._alpha_t[0]
-            else:
-                return self._alpha_t
+        """Handle being passed a list of alphas
+        Since no change in alpha return single value"""
+        if type(self._alpha_t) is list:
+            if len(self._alpha_t)>1:
+                print("Only one value of alpha needed. Using {} and ignoring {}.".format(self._alpha_t[0], self._alpha_t[1:]))
+            return self._alpha_t[0]
         else:
-            # Break into regions of different alpha
-            logalpha = np.full_like(R, np.log(self._alpha_t[0]))
-            for r in range(0, len(self._R_alpha)):
-                ka = np.log(self._alpha_t[r+1]/self._alpha_t[r])
-                Ha = self.H[np.argmin(np.abs(R-self._R_alpha[r]))]
-                logalpha += ka * 0.5 * (1 + np.tanh( (R-self._R_alpha[r]) / (self._R_alpha_w*Ha) ))
-            return np.exp(logalpha)
+            return self._alpha_t
 
     def _f_Pr(self):
         kappa = self._kappa_arr
@@ -394,7 +409,6 @@ def from_file(filename):
                 return LocallyIsothermalEOS.from_file(filename)
             else:
                 continue
-
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
