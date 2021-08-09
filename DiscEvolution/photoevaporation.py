@@ -107,11 +107,17 @@ class ExternalPhotoevaporationBase(object):
 
     def weighted_removal(self, disc, dt):
         """Remove gas according to the weighted prescription"""
+        # Annulus Areas
+        Re = disc.R_edge * AU
+        dA = np.pi * (Re[1:] ** 2 - Re[:-1] ** 2)
+        # Mass loss rates
         (dM_dot, dM_gas) = self.optically_thin_weighting(disc)
 
         # Account for dust entrainment
+        # First get initial dust conditions
         if (isinstance(disc,DustyDisc)):
-            # First get initial dust conditions
+            # Record state before removal for calculating abundances/dust fractions 
+            Sigma_G0 = disc.Sigma_G
             Sigma_D0 = disc.Sigma_D
             not_dustless = (Sigma_D0.sum(0) > 0)
             f_m = np.zeros_like(disc.Sigma)
@@ -119,33 +125,41 @@ class ExternalPhotoevaporationBase(object):
 
             # Update the maximum entrained size
             self.max_size_entrained(disc)
-            # Work out the total mass in entrained dust
+            # Work out the total mass in entrainable dust
             M_ent = self.dust_entrainment(disc)
 
-        # Annulus Areas
-        Re = disc.R_edge * AU
-        dA = np.pi * (Re[1:] ** 2 - Re[:-1] ** 2)
-
+        # Apply gas loss to Sigma
         dM_evap = dM_dot * dt
-        disc._Sigma -= dM_evap / dA # This amount of mass is lost in GAS
-
+        disc._Sigma -= dM_evap / dA
         self._Mcum_gas  += dM_evap.sum()  # Record mass loss
         
         if (isinstance(disc,DustyDisc)):
-            # Remove dust mass proportionally to gas loss 
+            # Apply dust loss (proportionally to gas loss) to Sigma
             M_ent_w = np.zeros_like(M_ent)
             M_ent_w[(dM_gas > 0)] = M_ent[(dM_gas > 0)] * dM_evap[(dM_gas > 0)] / dM_gas[(dM_gas > 0)]
             disc._Sigma -= M_ent_w / dA
-
-            # Update the dust mass fractions
-            not_empty = (disc.Sigma > 0)
-            new_dust_frac = np.zeros_like(disc.Sigma)
-            new_Sigma_D = Sigma_D0.sum(0)[not_empty] - M_ent_w[not_empty] / dA[not_empty]
-            new_dust_frac[not_empty] = new_Sigma_D / disc.Sigma[not_empty]
-            disc._eps[0][not_empty] = new_dust_frac[not_empty] * (1.0-f_m[not_empty])
-            disc._eps[1][not_empty] = new_dust_frac[not_empty] * f_m[not_empty]
-
             self._Mcum_dust += M_ent_w.sum() # Record mass loss
+
+            new_Sigma_G = Sigma_G0 - dM_evap / dA
+            new_Sigma_D = Sigma_D0.sum(0) - M_ent_w / dA
+            not_empty = (disc.Sigma > 0)
+            if disc.chem:
+                # Update gas abundances
+                for spec in disc.chem.gas.species:
+                    f_spec = disc.chem.gas[spec] / (disc.chem.gas.total_abund + 1e-300)    # Fraction of gas made of this species
+                    new_Sigma_spec = f_spec*new_Sigma_G
+                    disc.chem.gas[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty]
+                # Update ice abundances
+                for spec in disc.chem.ice.species:
+                    f_spec = disc.chem.ice[spec] / (disc.chem.ice.total_abund + 1e-300)    # Fraction of dust made of this species
+                    new_Sigma_spec = f_spec*new_Sigma_D
+                    disc.chem.ice[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty]
+                # Update ices call in driver will handle eps
+            else:
+                # Update the dust mass fractions directly
+                new_dust_frac = new_Sigma_D[not_empty] / disc.Sigma[not_empty]
+                disc._eps[0][not_empty] = new_dust_frac * (1.0-f_m[not_empty])
+                disc._eps[1][not_empty] = new_dust_frac * f_m[not_empty]
 
     def dust_entrainment(self, disc):
         # Representative sizes
