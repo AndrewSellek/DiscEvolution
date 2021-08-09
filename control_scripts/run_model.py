@@ -5,11 +5,6 @@
 #
 # Run a disc evolution model with transport and absorption / desorption but
 # no other chemical reactions. 
-#
-# Note:
-#   The environment variable 
-#       "KROME_PATH=/home/rab200/WorkingCopies/krome_ilee/build"
-#   should be set.
 ###############################################################################
 
 import os
@@ -34,6 +29,13 @@ from DiscEvolution.history import History
 import DiscEvolution.photoevaporation as photoevaporation
 import DiscEvolution.FRIED.photorate as photorate
 
+from DiscEvolution.chemistry import (
+    ChemicalAbund, MolecularIceAbund, SimpleCNOAtomAbund, SimpleCNOMolAbund,
+    SimpleCNOChemOberg, TimeDepCNOChemOberg,
+    EquilibriumCNOChemOberg,
+    SimpleCNOChemMadhu, EquilibriumCNOChemMadhu
+)
+
 ###############################################################################
 # Global Constants
 ###############################################################################
@@ -49,6 +51,58 @@ def LBP_profile(R,R_C,Sigma_C):
 # Setup Functions
 ###############################################################################
 
+#
+def setup_wrapper(model, restart, output=True):
+    # Setup basics
+    disc = setup_disc(model)
+    if model['disc']['d2g'] > 0:
+        dust = True
+        d_thresh = model['dust']['radii_thresholds']
+    else:
+        dust = False
+        d_thresh = None
+    history = History(dust, d_thresh)
+
+    # Setup model
+    if restart:
+        disc, history, time, photo_type, R_hole = restart_model(model, disc, history, restart)       
+        driver = setup_model(model, disc, history, time, internal_photo_type=photo_type, R_hole=R_hole)
+    else:
+        driver = setup_model(model, disc, history)
+
+    # Setup outputs
+    if output:
+        output_name, io_control, output_times = setup_output(model)
+        plot_name = model['output']['plot_name']
+    else:
+        output_name, io_control, plot_name = None, None, None
+
+    # Truncate disc at base of wind
+    if driver.photoevaporation_external and not restart and driver.photoevaporation_external._tshield<0:
+        print("Truncate initial disc")
+        if (isinstance(driver.photoevaporation_external,photoevaporation.FRIEDExternalEvaporationMS)):
+            driver.photoevaporation_external.optically_thin_weighting(disc)
+            optically_thin = (disc.R > driver.photoevaporation_external._Rot)
+        else:
+            initial_trunk = photoevaporation.FRIEDExternalEvaporationMS(disc)
+            initial_trunk.optically_thin_weighting(disc)
+            optically_thin = (disc.R > initial_trunk._Rot)
+
+        disc._Sigma[optically_thin] = 0
+
+        """Lines to truncate with no mass loss if required for direct comparison"""
+    """else:
+        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc)
+        optically_thin = (disc.R > disc.Rot(photoevap))"""
+    
+    Dt_nv = np.zeros_like(disc.R)
+    if driver.photoevaporation_external:
+        # Perform estimate of evolution for non-viscous case
+        (_, _, M_cum, Dt_nv) = driver.photoevaporation_external.get_timescale(disc)
+
+    return disc, driver, output_name, io_control, plot_name, Dt_nv
+
+##
 def setup_disc(model):
     '''Create disc object from initial conditions'''
 
@@ -138,6 +192,22 @@ def setup_disc(model):
     else:
         disc = AccretionDisc(grid, star, eos, Sigma=Sigma)
 
+    # Setup the chemical part of the disc
+    try:
+        chem = model['chemistry']
+    except KeyError:
+        chem = False
+    disc.chem = None
+    if chem:
+        if model['chemistry']["on"]:
+            if model['chemistry']['type'] == 'krome':
+                raise NotImplementedError("Haven't configured krome chemistry in this version")
+                #disc.chem = setup_init_abund_krome(model)
+                #disc.update_ices(disc.chem.ice)
+            else:
+                disc.chem = setup_init_abund_simple(model, disc)
+                disc.update_ices(disc.chem.ice)
+
     # Setup the external FUV irradiation
     try:
         p = model['fuv']
@@ -148,7 +218,93 @@ def setup_disc(model):
 
     return disc
 
+###
+def setup_init_abund_simple(model, disc):
+    chemistry = get_simple_chemistry_model(model)
 
+    X_solar = SimpleCNOAtomAbund(model['grid']['N'])
+    X_solar.set_solar_abundances()
+
+    # Iterate as the ice fraction changes the dust-to-gas ratio
+    for i in range(10):
+        chem = chemistry.equilibrium_chem(disc.T,
+                                          disc.midplane_gas_density,
+                                          disc.dust_frac.sum(0),
+                                          X_solar)
+        disc.initialize_dust_density(chem.ice.total_abund)
+    return chem
+
+####
+def get_simple_chemistry_model(model):
+    chem_type = model['chemistry']['type']
+
+    grain_size = 1e-5
+    try:
+        grain_size = model['chemistry']['fixed_grain_size']
+    except KeyError:
+        pass
+    
+    if chem_type == 'TimeDep':
+        chemistry = TimeDepCNOChemOberg(a=grain_size)                           #
+    elif chem_type == 'Madhu':
+        chemistry = EquilibriumCNOChemMadhu(fix_ratios=False, a=grain_size)     #
+    elif chem_type == 'Oberg':
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=False, a=grain_size)     #
+    elif chem_type == 'NoReact':
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=True, a=grain_size)      #
+    else:
+        raise ValueError("Unkown chemical model type")
+
+    return chemistry
+
+##
+def restart_model(model, disc, history, snap_number):
+    # Resetup model
+    out = model['output']
+    reader = DiscReader(out['directory'], out['base'], out['format'])
+
+    snap = reader[snap_number]
+
+    # Surface density
+    disc.Sigma[:] = snap.Sigma
+
+    # Dust
+    try:
+        disc.dust_frac[:] = snap.dust_frac
+        disc.grain_size[:] = snap.grain_size
+    except:
+        pass
+
+    # Chem
+    try:
+        chem = snap.chem
+        disc.chem.gas.data[:] = chem.gas.data
+        disc.chem.ice.data[:] = chem.ice.data
+    except AttributeError as e:
+        if model['chemistry']['on']:
+            raise e
+
+    time = snap.time * yr       # Convert real time (years) to code time
+
+    disc.update(0)
+
+    # Revise and write history
+    infile = model['output']['directory']+"/"+"discproperties.dat"
+    history.restart(infile, snap_number)
+
+    # Find current location of hole, if appropriate
+    try:
+        R_hole = history._Rh[-1]
+        if np.isnan(R_hole):
+            R_hole = None
+        else:
+            print("Hole is at: {} AU".format(R_hole))
+    except:
+        R_hole = None
+
+    return disc, history, time, snap.photo_type, R_hole     # Return disc objects, history, time (code units), input data and internal photoevaporation type
+
+##
 def setup_model(model, disc, history, start_time=0, internal_photo_type="Primordial", R_hole=None):
     '''Setup the physics of the model'''
     
@@ -169,6 +325,18 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
     if model['transport']['radial drift']:
         dust = SingleFluidDrift(diffuse)
         diffuse = None
+
+    try:
+        chem = model['chemistry']
+    except KeyError:
+        chem = False
+    if chem:    
+        if model['chemistry']['on']:
+            if  model['chemistry']['type'] == 'krome':
+                raise NotImplementedError("Haven't configured krome chemistry in this version")
+                #chemistry = setup_krome_chem(model)
+            else:
+                chemistry = setup_simple_chem(model)
 
     # Inititate the correct external photoevaporation routine
     # FRIED should be considered default 
@@ -244,10 +412,16 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         internal_photo = None    
 
     return DiscEvolutionDriver(disc, 
-                               gas=gas, dust=dust, diffusion=diffuse, ext_photoevaporation=photoevap, int_photoevaporation=internal_photo,
+                               gas=gas, dust=dust, diffusion=diffuse,
+                               chemistry=chemistry,
+                               ext_photoevaporation=photoevap, int_photoevaporation=internal_photo,
                                history=history, t0=start_time)
 
+###
+def setup_simple_chem(model):
+    return get_simple_chemistry_model(model)
 
+##
 def setup_output(model):
     
     out = model['output']
@@ -322,92 +496,6 @@ def setup_output(model):
         raise ValueError ("Output format {} not recognized".format(format))
 
     return base_name, EC, output_times / yr
-
-
-def setup_wrapper(model, restart, output=True):
-    # Setup basics
-    disc = setup_disc(model)
-    if model['disc']['d2g'] > 0:
-        dust = True
-        d_thresh = model['dust']['radii_thresholds']
-    else:
-        dust = False
-        d_thresh = None
-    history = History(dust, d_thresh)
-
-    # Setup model
-    if restart:
-        disc, history, time, photo_type, R_hole = restart_model(model, disc, history, restart)       
-        driver = setup_model(model, disc, history, time, internal_photo_type=photo_type, R_hole=R_hole)
-    else:
-        driver = setup_model(model, disc, history)
-
-    # Setup outputs
-    if output:
-        output_name, io_control, output_times = setup_output(model)
-        plot_name = model['output']['plot_name']
-    else:
-        output_name, io_control, plot_name = None, None, None
-
-    # Truncate disc at base of wind
-    if driver.photoevaporation_external and not restart and driver.photoevaporation_external._tshield<0:
-        print("Truncate initial disc")
-        if (isinstance(driver.photoevaporation_external,photoevaporation.FRIEDExternalEvaporationMS)):
-            driver.photoevaporation_external.optically_thin_weighting(disc)
-            optically_thin = (disc.R > driver.photoevaporation_external._Rot)
-        else:
-            initial_trunk = photoevaporation.FRIEDExternalEvaporationMS(disc)
-            initial_trunk.optically_thin_weighting(disc)
-            optically_thin = (disc.R > initial_trunk._Rot)
-
-        disc._Sigma[optically_thin] = 0
-
-        """Lines to truncate with no mass loss if required for direct comparison"""
-    """else:
-        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc)
-        optically_thin = (disc.R > disc.Rot(photoevap))"""
-    
-    Dt_nv = np.zeros_like(disc.R)
-    if driver.photoevaporation_external:
-        # Perform estimate of evolution for non-viscous case
-        (_, _, M_cum, Dt_nv) = driver.photoevaporation_external.get_timescale(disc)
-
-    return disc, driver, output_name, io_control, plot_name, Dt_nv
-
-
-def restart_model(model, disc, history, snap_number):
-    # Resetup model
-    out = model['output']
-    reader = DiscReader(out['directory'], out['base'], out['format'])
-
-    snap = reader[snap_number]
-
-    disc.Sigma[:] = snap.Sigma
-    try:
-        disc.dust_frac[:] = snap.dust_frac
-        disc.grain_size[:] = snap.grain_size
-    except:
-        pass
-
-    time = snap.time * yr       # Convert real time (years) to code time
-
-    disc.update(0)
-
-    # Revise and write history
-    infile = model['output']['directory']+"/"+"discproperties.dat"
-    history.restart(infile, snap_number)
-
-    # Find current location of hole, if appropriate
-    try:
-        R_hole = history._Rh[-1]
-        if np.isnan(R_hole):
-            R_hole = None
-        else:
-            print("Hole is at: {} AU".format(R_hole))
-    except:
-        R_hole = None
-
-    return disc, history, time, snap.photo_type, R_hole     # Return disc objects, history, time (code units), input data and internal photoevaporation type
 
 ###############################################################################
 # Saving - now moved to the history module

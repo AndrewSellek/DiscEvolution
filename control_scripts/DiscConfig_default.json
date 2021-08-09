@@ -75,6 +75,11 @@
 
 "euv" : {
 "Phi" : 0
+},
+
+"chemistry" : {
+"on"   : false, 
+"type" : "NoReact"
 }
 
 }
