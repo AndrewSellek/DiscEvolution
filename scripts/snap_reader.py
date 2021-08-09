@@ -43,7 +43,7 @@ class DiscSnap(object):
 
                 # If chemistry was used, get the number of chemical species
                 if chem_on:
-                    Nchem = (len(vars) - 3 - 2*Ndust) / 2
+                    Nchem = int((len(vars) - 3 - 2*Ndust) / 2)
                     
                     iChem = 2*Ndust + 3
                     chem_spec = vars[iChem:iChem + Nchem]
@@ -68,6 +68,9 @@ class DiscSnap(object):
             if Nchem == 6:
                 self._chem = chem.MolecularIceAbund(chem.SimpleCOMolAbund(Ndata),
                                                     chem.SimpleCOMolAbund(Ndata))
+            if Nchem == 8:
+                self._chem = chem.MolecularIceAbund(chem.SimpleCNOMolAbund(Ndata),
+                                                    chem.SimpleCNOMolAbund(Ndata))
             else:
                 raise AttributeError('Nchem = {}'.format(Nchem) + 
                                      '. Chemistry not recognized')
