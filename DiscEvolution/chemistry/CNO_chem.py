@@ -37,6 +37,19 @@ class SimpleCNOAtomAbund(ChemicalAbund):
         m_abund = np.array([12 * 1, 14 * 1, 16 * 1, 28 * 1])
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
 
+    def set_WTTS_abundances(self, muH=1.28):
+        """WTTS abundance fractions of C, N, O and Si (see Booth & Clarke 2018).
+        Based on data from Ardila et al. 2013
+        Set N to 1
+        Use average of doublet flux ratios for Si and C(nb =/= ratio of averages)
+        No O measurements - assume 1
+
+        args:
+            muH : mean atomic mass, default = 1.28
+        """
+        m_abund = np.array([12 * 6.17, 14 * 1, 16 * 1, 28 * 1.70])
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+
 class SimpleCNOMolAbund(ChemicalAbund):
     """Class that holds the abundances of molecules needed for C/O chemistry"""
 
