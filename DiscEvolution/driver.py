@@ -127,19 +127,6 @@ class DiscEvolutionDriver(object):
         if self._internal_photo:
             self._internal_photo(disc, dt/yr, self._external_photo)
 
-        # Pin the values to >= 0 and <=1:
-        disc.Sigma[:] = np.maximum(disc.Sigma, 0)        
-        try:
-            disc.dust_frac[:] = np.maximum(disc.dust_frac, 0)
-            disc.dust_frac[:] /= np.maximum(disc.dust_frac.sum(0), 1.0)
-        except AttributeError:
-            pass
-        try:
-            disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)
-            disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
-        except AttributeError:
-            pass
-
         # Chemistry
         if self._chemistry:
             rho = disc.midplane_gas_density
@@ -153,6 +140,19 @@ class DiscEvolutionDriver(object):
             # If we have dust, we should update it now the ice fraction has
             # changed
             disc.update_ices(disc.chem.ice)
+
+        # Pin the values to >= 0 and <=1:
+        disc.Sigma[:] = np.maximum(disc.Sigma, 0)        
+        try:
+            disc.dust_frac[:] = np.maximum(disc.dust_frac, 0)
+            disc.dust_frac[:] /= np.maximum(disc.dust_frac.sum(0), 1.0)
+        except AttributeError:
+            pass
+        try:
+            disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)
+            disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
+        except AttributeError:
+            pass
 
         # Now we should update the auxillary properties, do grain growth etc
         disc.update(dt)

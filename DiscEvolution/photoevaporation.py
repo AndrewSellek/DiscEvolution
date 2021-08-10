@@ -154,7 +154,7 @@ class ExternalPhotoevaporationBase(object):
                     f_spec = disc.chem.ice[spec] / (disc.chem.ice.total_abund + 1e-300)    # Fraction of dust made of this species
                     new_Sigma_spec = f_spec*new_Sigma_D
                     disc.chem.ice[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty]
-                # Update ices call in driver will handle eps
+                disc.update_ices(disc.chem.ice)
             else:
                 # Update the dust mass fractions directly
                 new_dust_frac = new_Sigma_D[not_empty] / disc.Sigma[not_empty]

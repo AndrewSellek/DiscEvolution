@@ -455,7 +455,7 @@ class SingleFluidDrift(object):
             head.update(dict([self._diffuse.HDF5_attributes()]))
         return self.__class__.__name__ , head
 
-    def max_timestep(self, disc, v_visc=None):
+    def max_timestep(self, disc, v_visc=None, debug=False):
         step = np.inf
         Cou = 0.5       # Courant number
         
@@ -465,6 +465,10 @@ class SingleFluidDrift(object):
         dVout[:, 0] = dVout[:, 1]
         dVout[:,-1] = dVout[:,-2]
         dVtot = np.abs(dVout[:,1:]) + np.abs(dVout[:,:-1])  # Potentially a cell can lose dust in both directions, both should be included to ensure stability
+        if debug:
+            loc_min = np.argmin(disc.grid.dRe / dVtot)
+            print("R:", disc.R_edge[loc_min])
+            self._compute_deltaV(disc, v_visc, debug=loc_min-1)
         return Cou * (disc.grid.dRe / dVtot).min()
     
     def _donor_flux(self, Ree, deltaV_i, Sigma, eps_i):
@@ -540,7 +544,7 @@ class SingleFluidDrift(object):
 
         return deps
 
-    def _compute_deltaV(self, disc, v_visc=None):
+    def _compute_deltaV(self, disc, v_visc=None, debug=None):
         """Compute the total dust-gas background velocity"""
 
         Sigma  = disc.Sigma
