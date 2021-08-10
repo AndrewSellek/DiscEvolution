@@ -468,7 +468,7 @@ class SingleFluidDrift(object):
         if debug:
             loc_min = np.argmin(disc.grid.dRe / dVtot)
             print("R:", disc.R_edge[loc_min])
-            self._compute_deltaV(disc, v_visc, debug=loc_min-1)
+            #self._compute_deltaV(disc, v_visc, debug=loc_min-1)
         return Cou * (disc.grid.dRe / dVtot).min()
     
     def _donor_flux(self, Ree, deltaV_i, Sigma, eps_i):

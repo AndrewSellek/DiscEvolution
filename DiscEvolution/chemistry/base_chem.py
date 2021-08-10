@@ -357,7 +357,7 @@ class ThermalChem(object):
         
         X_eq = X_t - np.minimum(X_t   * Sd/(Sa + Sd + 1e-300),
                                 X_max * Sd/(Sa + 1e-300))
-        return X_eq * m_mol / mu
+        return X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that dust can't spontaneously generate without nucleation sites
         
     
     def _update_ice_balance(self, dt, T, rho, dust_frac, spec, abund):

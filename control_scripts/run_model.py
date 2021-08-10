@@ -88,12 +88,12 @@ def setup_wrapper(model, restart, output=True):
             initial_trunk.optically_thin_weighting(disc)
             optically_thin = (disc.R > initial_trunk._Rot)
 
-        disc._Sigma[optically_thin] = 0
-
-        """Lines to truncate with no mass loss if required for direct comparison"""
-    """else:
-        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc)
-        optically_thin = (disc.R > disc.Rot(photoevap))"""
+        print("Truncating initial disc at", driver.photoevaporation_external._Rot)
+        disc._Sigma[optically_thin] = 0.
+        disc._eps[:,optically_thin] = 0.
+        if disc.chem:
+            for spec in disc.chem.ice.species:
+                disc.chem.ice[spec][optically_thin] = 0.
     
     Dt_nv = np.zeros_like(disc.R)
     if driver.photoevaporation_external:

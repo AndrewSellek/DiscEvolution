@@ -78,6 +78,8 @@ class DiscSnap(object):
             for i in range(Nchem):
                 self._chem.gas.data[i] = data[names[iChem+i]]
                 self._chem.ice.data[i] = data[names[iChem+Nchem+i]]
+        else:
+            self._chem = None
                                                         
     @property
     def photo_type(self):
