@@ -20,7 +20,7 @@ class SimpleCNOAtomAbund(ChemicalAbund):
         super(SimpleCNOAtomAbund, self).__init__(atom_ids, masses, *sizes)
 
     def set_solar_abundances(self, muH=1.28):
-        """Solar mass fractions of C, O and Si.
+        """Solar mass fractions of C, N, O and Si.
 
         args:
             muH : mean atomic mass, default = 1.28
@@ -28,6 +28,14 @@ class SimpleCNOAtomAbund(ChemicalAbund):
         m_abund = np.array([12 * 2.7e-4, 14 * 6.8e-5, 16 * 4.9e-4, 28 * 3.2e-5])
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
 
+    def set_unit_abundances(self, muH=1.28):
+        """Unit abundance fractions of C, N, O and Si.
+
+        args:
+            muH : mean atomic mass, default = 1.28
+        """
+        m_abund = np.array([12 * 1, 14 * 1, 16 * 1, 28 * 1])
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
 
 class SimpleCNOMolAbund(ChemicalAbund):
     """Class that holds the abundances of molecules needed for C/O chemistry"""
