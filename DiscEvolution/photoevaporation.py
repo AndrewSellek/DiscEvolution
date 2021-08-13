@@ -140,30 +140,35 @@ class ExternalPhotoevaporationBase(object):
             disc._Sigma = np.maximum(disc._Sigma - M_ent_w / dA, 0)
             self._Mcum_dust += M_ent_w.sum() # Record mass loss
 
-            new_Sigma_G = Sigma_G0 - dM_evap / dA
-            new_Sigma_D = Sigma_D0.sum(0) - M_ent_w / dA
+            new_Sigma_G = np.maximum(Sigma_G0 - dM_evap / dA, 0)
+            new_Sigma_D = np.maximum(Sigma_D0.sum(0) - M_ent_w / dA, 0)
             not_empty = (disc.Sigma > 0)
-            #print(np.sum(~not_empty))
+            not_dustless = not_empty * (Sigma_D0.sum(0) > 0)
             if disc.chem:
                 # Update gas abundances
                 for spec in disc.chem.gas.species:
-                    f_spec = disc.chem.gas[spec] / (disc.chem.gas.total_abund + 1e-300)    # Fraction of gas made of this species
-                    new_Sigma_spec = f_spec*new_Sigma_G
-                    disc.chem.gas[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty]
+                    #f_spec = disc.chem.gas[spec] / (disc.chem.gas.total_abund + 1e-300)    # Fraction of gas made of this species
+                    #new_Sigma_spec = f_spec*new_Sigma_G
+                    #disc.chem.gas[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty] / disc.chem.gas.mu()
+                    disc.chem.ice[spec][not_empty] *= new_Sigma_G[not_empty] / Sigma_G0[not_empty]
                     disc.chem.gas[spec][~not_empty] = 0.
                 # Update ice abundances
                 for spec in disc.chem.ice.species:
-                    f_spec = disc.chem.ice[spec] / (disc.chem.ice.total_abund + 1e-300)    # Fraction of dust made of this species
-                    new_Sigma_spec = f_spec*new_Sigma_D
-                    disc.chem.ice[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty]
-                    disc.chem.ice[spec][~not_empty] = 0.
+                    #f_spec = disc.chem.ice[spec] / (disc.chem.ice.total_abund + 1e-300)    # Fraction of dust made of this species
+                    #new_Sigma_spec = f_spec*new_Sigma_D
+                    #disc.chem.ice[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty] / disc.chem.ice.mu()
+                    disc.chem.ice[spec][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
+                    disc.chem.ice[spec][~not_dustless] = 0.
                 disc.update_ices(disc.chem.ice)
             else:
                 # Update the dust mass fractions directly
-                new_dust_frac = new_Sigma_D[not_empty] / disc.Sigma[not_empty]
-                disc._eps[0][not_empty] = new_dust_frac * (1.0-f_m[not_empty])
-                disc._eps[1][not_empty] = new_dust_frac * f_m[not_empty]
-                disc._eps[:,~not_empty] = 0.
+                #new_dust_frac = new_Sigma_D[not_empty] / disc.Sigma[not_empty]
+                #disc._eps[0][not_empty] = new_dust_frac * (1.0-f_m[not_empty])
+                #disc._eps[1][not_empty] = new_dust_frac * f_m[not_empty]
+                #print(disc.Sigma[not_empty][Sigma_D0.sum(0)[not_empty]==0], disc._eps[:,not_empty][:,(Sigma_D0.sum(0)[not_empty]==0)])
+                disc._eps[0][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
+                disc._eps[1][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
+                disc._eps[:,~not_dustless] = 0.
 
     def dust_entrainment(self, disc):
         # Representative sizes
