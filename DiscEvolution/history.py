@@ -86,7 +86,7 @@ class History(object):
     def restart(self, filename, snap_number):
         restartdata = np.genfromtxt(filename, names=True, comments='#', max_rows=snap_number+1)
         try:
-            restartchem = np.genfromtxt(filename.split('/')[0]+'windcomposition.dat', names=True, comments='#', max_rows=snap_number+1)
+            restartchem = np.genfromtxt(filename.split('/')[0]+'/windcomposition.dat', names=True, comments='#', max_rows=snap_number+1)
         except:
             restartchem = {}
         
@@ -292,7 +292,7 @@ class History(object):
         np.savetxt(str(save_directory)+"/discproperties.dat", outputdata, delimiter='\t', header=full_head)
 
         if driver.photoevaporation_external:
-            abun_head = "\t".join(['d_wind']+[atom+'_wind' for atom in self._chem.gas.atomic_abundance().atom_ids])
+            abun_head = "\t".join(['t', 'd_wind']+[atom+'_wind' for atom in self._chem.gas.atomic_abundance().atom_ids])
             abundata  = np.column_stack((used_times, self._wind_abun['d']))
             for atom in self._chem.gas.atomic_abundance().atom_ids:
                 abundata = np.column_stack((abundata, self._wind_abun[atom]))
