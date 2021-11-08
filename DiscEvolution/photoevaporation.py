@@ -142,7 +142,7 @@ class ExternalPhotoevaporationBase(object):
 
             # Work out composition of wind
             if disc.chem:
-                for atom in disc.chem.gas._all_atom:
+                for atom in disc.chem.gas.atomic_abundance().atom_ids:
                     M_ent_ice = np.zeros_like(M_ent)
                     M_ent_gas = np.zeros_like(M_ent)
                     atom_ice = disc.chem.ice.atomic_abundance()[atom]/disc.chem.ice.total_abund
@@ -239,8 +239,8 @@ class FixedExternalEvaporation(ExternalPhotoevaporationBase):
 
         self._Mcum_gas  = 0.0
         self._Mcum_dust = 0.0
-        self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas._all_atom}
-        self._wind_abun = {atom: 0.0 for atom in disc.chem.gas._all_atom}
+        self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids}
+        self._wind_abun = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids}
 
     def __call__(self, disc, dt):
         if (self._Mdot > 0):
@@ -278,8 +278,8 @@ class TimeExternalEvaporation(ExternalPhotoevaporationBase):
 
         self._Mcum_gas  = 0.0
         self._Mcum_dust = 0.0
-        self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas._all_atom}
-        self._wind_abun = {atom: 0.0 for atom in disc.chem.gas._all_atom}
+        self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids}
+        self._wind_abun = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids}
 
     def mass_loss_rate(self, disc):
         k = np.pi * AU**2 / Msun
@@ -322,12 +322,12 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
         self._Mcum_gas  = Mcum_gas
         self._Mcum_dust = Mcum_dust
         if Mcum_chem:
-            self._Mcum_chem = {atom: Mcum_chem[atom] for atom in disc.chem.gas._all_atom}
-            self._wind_abun = {atom: Mcum_chem[atom] for atom in disc.chem.gas._all_atom}
+            self._Mcum_chem = {atom: Mcum_chem[atom] for atom in disc.chem.gas.atomic_abundance().atom_ids}
+            self._wind_abun = {atom: Mcum_chem[atom] for atom in disc.chem.gas.atomic_abundance().atom_ids}
             self._wind_abun['d'] = Mcum_chem['d']
         elif disc.chem:
-            self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas._all_atom}
-            self._wind_abun = {atom: 0.0 for atom in disc.chem.gas._all_atom} 
+            self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids}
+            self._wind_abun = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids} 
             self._wind_abun['d'] = 0.0   
 
     def __call__(self, disc, dt):

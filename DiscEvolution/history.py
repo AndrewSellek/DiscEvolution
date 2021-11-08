@@ -45,8 +45,8 @@ class History(object):
         if self._dust:
             self._Mcum_dust = np.array([])  # Total amount of dust lost to wind
         if self._chem:
-            self._Mcum_chem = {atom: np.array([]) for atom in self._chem.gas._all_atom}
-            self._wind_abun = {atom: np.array([]) for atom in self._chem.gas._all_atom}
+            self._Mcum_chem = {atom: np.array([]) for atom in self._chem.gas.atomic_abundance().atom_ids}
+            self._wind_abun = {atom: np.array([]) for atom in self._chem.gas.atomic_abundance().atom_ids}
             self._wind_abun['d'] = np.array([])
 
     """Methods to return values"""
@@ -152,7 +152,7 @@ class History(object):
 
         # Chemistry-Only Parameters
         if self._chem:
-            for atom in self._chem.gas._all_atom:
+            for atom in self._chem.gas.atomic_abundance().atom_ids:
                 try:
                     self._Mcum_chem[atom] = restartchem['M_ext'+atom]
                 except ValueError:
@@ -198,7 +198,7 @@ class History(object):
             if self._dust:
                 self._Mcum_dust = np.append(self._Mcum_dust,[driver.photoevaporation_external._Mcum_dust])                          # Total mass of dust lost in wind
             if self._chem:
-                for atom in self._chem.gas._all_atom:
+                for atom in self._chem.gas.atomic_abundance().atom_ids:
                     self._Mcum_chem[atom] = np.append(self._Mcum_chem[atom], [driver.photoevaporation_external._Mcum_chem[atom]])   # Total mass of each atom lost in wind
                     self._wind_abun[atom] = np.append(self._wind_abun[atom], [driver.photoevaporation_external._wind_abun[atom]])   # Current composition of wind
                 self._wind_abun['d'] = np.append(self._wind_abun['d'], [driver.photoevaporation_external._wind_abun['d']])          # Dust-to-gas ratio of wind
@@ -292,9 +292,9 @@ class History(object):
         np.savetxt(str(save_directory)+"/discproperties.dat", outputdata, delimiter='\t', header=full_head)
 
         if driver.photoevaporation_external:
-            abun_head = "\t".join(['d_wind']+[atom+'_wind' for atom in self._chem.gas._all_atom])
+            abun_head = "\t".join(['d_wind']+[atom+'_wind' for atom in self._chem.gas.atomic_abundance().atom_ids])
             abundata  = np.column_stack((used_times, self._wind_abun['d']))
-            for atom in self._chem.gas._all_atom:
+            for atom in self._chem.gas.atomic_abundance().atom_ids:
                 abundata = np.column_stack((abundata, self._wind_abun[atom]))
             np.savetxt(str(save_directory)+"/windcomposition.dat", abundata, delimiter='\t', header=abun_head)
 
