@@ -13,9 +13,10 @@ from .constants import yr
 class History(object):
 
     """Setup"""
-    def __init__(self, dust, dthresh):
+    def __init__(self, dust, dthresh, chem):
         self._threshold = 1e-5          # Threshold for defining edge by density
         self._dust = dust
+        self._chem = chem
         if self._dust:
             self._dthresholds = dthresh # Threshold percentiles of dust mass
         
@@ -26,14 +27,14 @@ class History(object):
         self._Rc    = np.array([])      # Radius of current best fit scale radius
         self._Ropt  = np.array([])      # Radius where Mdot maximum ie where becomes optically thick
         self._Rh    = np.array([])      # Outer radius of the transition disc hole
-        if dust:
+        if self._dust:
             self._Rdust = {}            # Radius containing user defined fraction of dust
             for threshold in self._dthresholds:
                 self._Rdust[threshold] = np.array([])
 
         """Mass"""
         self._Mtot = np.array([])       # Total mass
-        if dust:
+        if self._dust:
             self._Mdust = np.array([])  # Mass of dust in disc
 
         """Mass Loss"""
@@ -41,8 +42,12 @@ class History(object):
         self._Mdot_ext = np.array([])   # External photoevaporation rate
         self._Mdot_int = np.array([])   # Internal photoevaporation rate
         self._Mcum_gas = np.array([])   # Total amount of gas lost to wind
-        if dust:
+        if self._dust:
             self._Mcum_dust = np.array([])  # Total amount of dust lost to wind
+        if self._chem:
+            self._Mcum_chem = {atom: np.array([]) for atom in self._chem.gas._all_atom}
+            self._wind_abun = {atom: np.array([]) for atom in self._chem.gas._all_atom}
+            self._wind_abun['d'] = np.array([])
 
     """Methods to return values"""
     # Return times
@@ -80,6 +85,10 @@ class History(object):
     """When restarting, for any variable found in input file, import data"""
     def restart(self, filename, snap_number):
         restartdata = np.genfromtxt(filename, names=True, comments='#', max_rows=snap_number+1)
+        try:
+            restartchem = np.genfromtxt(filename.split('/')[0]+'windcomposition.dat', names=True, comments='#', max_rows=snap_number+1)
+        except:
+            restartchem = {}
         
         self._times = restartdata['t']
         print("Restarting with times:\n",self.times)
@@ -141,6 +150,22 @@ class History(object):
             except ValueError:
                 pass
 
+        # Chemistry-Only Parameters
+        if self._chem:
+            for atom in self._chem.gas._all_atom:
+                try:
+                    self._Mcum_chem[atom] = restartchem['M_ext'+atom]
+                except ValueError:
+                    pass
+                try:
+                    self._wind_abun[atom] = restartchem[atom+'_wind']
+                except ValueError:
+                    pass
+            try:
+                self._wind_abun['d'] = restartchem['d_wind']
+            except ValueError:
+                pass
+
     """Call"""
     def __call__(self, driver):
         self._times = np.append(self._times,[driver.t / yr])
@@ -169,9 +194,14 @@ class History(object):
         if driver.photoevaporation_external:
             self._Mdot_ext  = np.append(self._Mdot_ext,[driver.photoevaporation_external._Mdot])
             self._Ropt      = np.append(self._Ropt,[driver.photoevaporation_external._Rot])
-            self._Mcum_gas  = np.append(self._Mcum_gas,[driver.photoevaporation_external._Mcum_gas])       # Total mass of gas  lost in wind
+            self._Mcum_gas  = np.append(self._Mcum_gas,[driver.photoevaporation_external._Mcum_gas])                                # Total mass of gas  lost in wind
             if self._dust:
-                self._Mcum_dust = np.append(self._Mcum_dust,[driver.photoevaporation_external._Mcum_dust]) # Total mass of dust lost in wind
+                self._Mcum_dust = np.append(self._Mcum_dust,[driver.photoevaporation_external._Mcum_dust])                          # Total mass of dust lost in wind
+            if self._chem:
+                for atom in self._chem.gas._all_atom:
+                    self._Mcum_chem[atom] = np.append(self._Mcum_chem[atom], [driver.photoevaporation_external._Mcum_chem[atom]])   # Total mass of each atom lost in wind
+                    self._wind_abun[atom] = np.append(self._wind_abun[atom], [driver.photoevaporation_external._wind_abun[atom]])   # Current composition of wind
+                self._wind_abun['d'] = np.append(self._wind_abun['d'], [driver.photoevaporation_external._wind_abun['d']])          # Dust-to-gas ratio of wind
 
         # 6 Internal photoevaporation
         if driver.photoevaporation_internal:
@@ -181,7 +211,7 @@ class History(object):
 
     """Remove hole radii if identification of hole later deemed to be wrong"""
     def clear_hole(self):
-        self._R = np.full_like(self._Rh, np.nan)
+        self._Rh = np.full_like(self._Rh, np.nan)
 
     """Save the history so far"""
     def save(self, driver, save_directory):
@@ -260,5 +290,12 @@ class History(object):
         full_head = "\n".join([head,units])
             
         np.savetxt(str(save_directory)+"/discproperties.dat", outputdata, delimiter='\t', header=full_head)
+
+        if driver.photoevaporation_external:
+            abun_head = "\t".join(['d_wind']+[atom+'_wind' for atom in self._chem.gas._all_atom])
+            abundata  = np.column_stack((used_times, self._wind_abun['d']))
+            for atom in self._chem.gas._all_atom:
+                abundata = np.column_stack((abundata, self._wind_abun[atom]))
+            np.savetxt(str(save_directory)+"/windcomposition.dat", abundata, delimiter='\t', header=abun_head)
 
         return outputdata               

@@ -61,7 +61,8 @@ def setup_wrapper(model, restart, output=True):
     else:
         dust = False
         d_thresh = None
-    history = History(dust, d_thresh)
+    
+    history = History(dust, d_thresh, disc.chem)
 
     # Setup model
     if restart:
@@ -92,6 +93,8 @@ def setup_wrapper(model, restart, output=True):
         disc._Sigma[optically_thin] = 0.
         disc._eps[:,optically_thin] = 0.
         if disc.chem:
+            #for spec in disc.chem.gas.species:
+            #    disc.chem.gas[spec][optically_thin] = 0.
             for spec in disc.chem.ice.species:
                 disc.chem.ice[spec][optically_thin] = 0.
     

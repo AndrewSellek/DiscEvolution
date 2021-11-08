@@ -71,6 +71,9 @@ class SimpleCNOMolAbund(ChemicalAbund):
                         'C-grain': {'C': 1, },
                         'Si-grain': {'O': 3, 'Si': 1},
                         }
+        self._all_atom = set({})
+        for mol in self.species:
+            self._all_atom = self._all_atom.union(set(self._n_spec[mol].keys()))
 
     def atomic_abundance(self):
         """Compute the mass abundances of atomic species in the molecules"""

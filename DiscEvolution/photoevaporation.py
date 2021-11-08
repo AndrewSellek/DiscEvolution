@@ -140,6 +140,19 @@ class ExternalPhotoevaporationBase(object):
             disc._Sigma = np.maximum(disc._Sigma - M_ent_w / dA, 0)
             self._Mcum_dust += M_ent_w.sum() # Record mass loss
 
+            # Work out composition of wind
+            if disc.chem:
+                for atom in disc.chem.gas._all_atom:
+                    M_ent_ice = np.zeros_like(M_ent)
+                    M_ent_gas = np.zeros_like(M_ent)
+                    atom_ice = disc.chem.ice.atomic_abundance()[atom]/disc.chem.ice.total_abund
+                    atom_gas = disc.chem.gas.atomic_abundance()[atom]/(1-disc.chem.ice.total_abund)
+                    M_ent_ice[(dM_gas > 0)] = M_ent_w[(dM_gas > 0)]*atom_ice[(dM_gas > 0)]
+                    M_ent_gas[(dM_gas > 0)] = (dM_evap[(dM_gas > 0)]-M_ent_w[(dM_gas > 0)])*atom_gas[(dM_gas > 0)]
+                    self._Mcum_chem[atom] += np.nansum(M_ent_ice+M_ent_gas)
+                    self._wind_abun[atom]  = np.nansum(M_ent_ice+M_ent_gas)/dM_evap.sum()
+                self._wind_abun['d'] = M_ent_w.sum()/dM_evap.sum()
+
             new_Sigma_G = np.maximum(Sigma_G0 - dM_evap / dA, 0)
             new_Sigma_D = np.maximum(Sigma_D0.sum(0) - M_ent_w / dA, 0)
             not_empty = (disc.Sigma > 0)
@@ -147,25 +160,15 @@ class ExternalPhotoevaporationBase(object):
             if disc.chem:
                 # Update gas abundances
                 for spec in disc.chem.gas.species:
-                    #f_spec = disc.chem.gas[spec] / (disc.chem.gas.total_abund + 1e-300)    # Fraction of gas made of this species
-                    #new_Sigma_spec = f_spec*new_Sigma_G
-                    #disc.chem.gas[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty] / disc.chem.gas.mu()
                     disc.chem.ice[spec][not_empty] *= new_Sigma_G[not_empty] / Sigma_G0[not_empty]
                     disc.chem.gas[spec][~not_empty] = 0.
                 # Update ice abundances
                 for spec in disc.chem.ice.species:
-                    #f_spec = disc.chem.ice[spec] / (disc.chem.ice.total_abund + 1e-300)    # Fraction of dust made of this species
-                    #new_Sigma_spec = f_spec*new_Sigma_D
-                    #disc.chem.ice[spec][not_empty] = new_Sigma_spec[not_empty] / disc.Sigma[not_empty] / disc.chem.ice.mu()
                     disc.chem.ice[spec][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
                     disc.chem.ice[spec][~not_dustless] = 0.
                 disc.update_ices(disc.chem.ice)
             else:
                 # Update the dust mass fractions directly
-                #new_dust_frac = new_Sigma_D[not_empty] / disc.Sigma[not_empty]
-                #disc._eps[0][not_empty] = new_dust_frac * (1.0-f_m[not_empty])
-                #disc._eps[1][not_empty] = new_dust_frac * f_m[not_empty]
-                #print(disc.Sigma[not_empty][Sigma_D0.sum(0)[not_empty]==0], disc._eps[:,not_empty][:,(Sigma_D0.sum(0)[not_empty]==0)])
                 disc._eps[0][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
                 disc._eps[1][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
                 disc._eps[:,~not_dustless] = 0.
@@ -236,6 +239,8 @@ class FixedExternalEvaporation(ExternalPhotoevaporationBase):
 
         self._Mcum_gas  = 0.0
         self._Mcum_dust = 0.0
+        self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas._all_atom}
+        self._wind_abun = {atom: 0.0 for atom in disc.chem.gas._all_atom}
 
     def __call__(self, disc, dt):
         if (self._Mdot > 0):
@@ -273,6 +278,8 @@ class TimeExternalEvaporation(ExternalPhotoevaporationBase):
 
         self._Mcum_gas  = 0.0
         self._Mcum_dust = 0.0
+        self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas._all_atom}
+        self._wind_abun = {atom: 0.0 for atom in disc.chem.gas._all_atom}
 
     def mass_loss_rate(self, disc):
         k = np.pi * AU**2 / Msun
@@ -305,7 +312,7 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
         tshield : A delay to the onset of photoevaporation in yr (in development)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
         self._Mdot = 0.0
         self._tshield = tshield * yr
         self._amax = amax * np.zeros_like(disc.R)
@@ -314,6 +321,14 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
 
         self._Mcum_gas  = Mcum_gas
         self._Mcum_dust = Mcum_dust
+        if Mcum_chem:
+            self._Mcum_chem = {atom: Mcum_chem[atom] for atom in disc.chem.gas._all_atom}
+            self._wind_abun = {atom: Mcum_chem[atom] for atom in disc.chem.gas._all_atom}
+            self._wind_abun['d'] = Mcum_chem['d']
+        elif disc.chem:
+            self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas._all_atom}
+            self._wind_abun = {atom: 0.0 for atom in disc.chem.gas._all_atom} 
+            self._wind_abun['d'] = 0.0   
 
     def __call__(self, disc, dt):
         if self._density:    # For FRIED mass loss rates calculated with density, need to use optical depth method
@@ -344,8 +359,8 @@ class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
     """External photoevaporation flow with a mass loss rate which is dependent on radius and surface density.
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
-        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
+        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
         self.FRIED_Rates = photorate.FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
@@ -362,8 +377,8 @@ class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
     Calculated by converting to the mass within 400 AU (M400 ~ R Sigma)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
-        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
+        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
         self.FRIED_Rates = photorate.FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
@@ -380,8 +395,8 @@ class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
     Calculated by converting to the mass within 400 AU (M400 ~ M / R)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0):
-        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
+        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
         self.FRIED_Rates = photorate.FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = False
 
