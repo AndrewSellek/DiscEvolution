@@ -28,15 +28,6 @@ class SimpleCNOAtomAbund(ChemicalAbund):
         m_abund = np.array([12 * 2.7e-4, 14 * 6.8e-5, 16 * 4.9e-4, 28 * 3.2e-5])
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
 
-    def set_unit_abundances(self, muH=1.28):
-        """Unit abundance fractions of C, N, O and Si.
-
-        args:
-            muH : mean atomic mass, default = 1.28
-        """
-        m_abund = np.array([12 * 1, 14 * 1, 16 * 1, 28 * 1])
-        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
-
     def set_WTTS_abundances(self, muH=1.28):
         """WTTS abundance fractions of C, N, O and Si (see Booth & Clarke 2018).
         Based on data from Ardila et al. 2013
@@ -48,6 +39,24 @@ class SimpleCNOAtomAbund(ChemicalAbund):
             muH : mean atomic mass, default = 1.28
         """
         m_abund = np.array([12 * 6.17, 14 * 1, 16 * 1, 28 * 1.70])
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+
+    def set_mass_abundances(self, muH=1.28):
+        """Mass abundance fractions of C, N, O and Si.
+
+        args:
+            muH : mean atomic mass, default = 1.28
+        """
+        m_abund = np.array([12 * 1, 14 * 1, 16 * 1, 28 * 1])
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+
+    def set_unit_abundances(self, muH=1.28):
+        """Unit abundance fractions of C, N, O and Si.
+
+        args:
+            muH : mean atomic mass, default = 1.28
+        """
+        m_abund = np.array([1, 1, 1, 1])
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
 
 class SimpleCNOMolAbund(ChemicalAbund):
