@@ -25,10 +25,9 @@ class DustyDisc(AccretionDisc):
         feedback : When False, the dust mass is considered to be a negligible
                    fraction of the total mass.
     """
-    def __init__(self, grid, star, eos, Sigma=None, rho_s=1., Sc=1.,
-                 feedback=True):
+    def __init__(self, grid, star, eos, Sigma=None, FUV=0.0, rho_s=1., Sc=1., feedback=True):
 
-        super(DustyDisc, self).__init__(grid, star, eos, Sigma)
+        super(DustyDisc, self).__init__(grid, star, eos, Sigma=Sigma, FUV=FUV)
 
         self._rho_s = rho_s
         self._Kdrag = (np.pi * rho_s) / 2.
@@ -136,8 +135,7 @@ class DustyDisc(AccretionDisc):
 
         new_age = self._star.age + dt/(2*np.pi)
         self._star.evolve(new_age)
-        self._eos.update(dt, self.Sigma,
-                         amax=self.grain_size[-1], star=self._star)
+        self._eos.update(dt, self.Sigma, star=self._star, amax=self.grain_size[-1], FUV=self.FUV)
     
     def update_ices(self, chem):
         """Update ice fractions"""
@@ -177,8 +175,8 @@ class FixedSizeDust(DustyDisc):
         Sc       : Schmidt number, default=1
         feedback : default=True
     """
-    def __init__(self, grid, star, eos, eps, size, Sigma=None, rho_s=1., Sc=1., feedback=True):
-        super(FixedSizeDust, self).__init__(grid, star, eos, Sigma=Sigma, rho_s=rho_s, Sc=Sc, feedback=feedback)
+    def __init__(self, grid, star, eos, eps, size, Sigma=None, FUV=0.0, rho_s=1., Sc=1., feedback=True):
+        super(FixedSizeDust, self).__init__(grid, star, eos, Sigma=Sigma, FUV=FUV, rho_s=rho_s, Sc=Sc, feedback=feedback)
 
         shape = np.atleast_1d(size).shape + (self.Ncells,)
         self._eps  = np.empty(shape, dtype='f8')
@@ -224,10 +222,10 @@ class DustGrowthTwoPop(DustyDisc):
         distribution_slope:
                     The slope d ln n(a) / d ln a of the number distribution with size (3.5 for MRN)
     """
-    def __init__(self, grid, star, eos, eps, Sigma=None,
+    def __init__(self, grid, star, eos, eps, Sigma=None, FUV=0.0,
                  rho_s=1., Sc=1., uf_0=100., uf_ice=1e3, f_ice=1, thresh=0.1,
                  f_grow=1.0, a0=1e-5, amin=1e-5, f_drift=0.55, f_frag=0.37, feedback=True, start_small=True, distribution_slope=3.5):
-        super(DustGrowthTwoPop, self).__init__(grid, star, eos, Sigma, rho_s, Sc, feedback)
+        super(DustGrowthTwoPop, self).__init__(grid, star, eos, Sigma=Sigma, FUV=FUV, rho_s=rho_s, Sc=Sc, feedback=feedback)
         
         self._uf_0   = uf_0 / (AU * Omega0)
         self._uf_ice = uf_ice / (AU * Omega0)

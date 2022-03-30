@@ -19,14 +19,14 @@ def LBP_profile(R,R_C,Sigma_C):
 
 class AccretionDisc(object):
 
-    def __init__(self, grid, star, eos, Sigma=None):
+    def __init__(self, grid, star, eos, Sigma=None, FUV=0.0):
         self._grid = grid
         self._star = star
         self._eos  = eos
-        self._FUV = 0.0
         if Sigma is None:
             Sigma = np.zeros_like(self.R)
         self._Sigma = Sigma
+        self.set_FUV(FUV)
         
         """ Extra properties for dealing with half empty cells in timescale approach """
         self.mass_lost = 0.0
@@ -47,7 +47,7 @@ class AccretionDisc(object):
                                                self._star.HDF5_attributes(),
                                                self._eos.HDF5_attributes() ])
 
-    def set_FUV(self,FUV):
+    def set_FUV(self, FUV):
         """Update the external FUV flux irradiating the disc"""
         self._FUV = FUV
 
@@ -199,7 +199,7 @@ class AccretionDisc(object):
 
         new_age = self._star.age + dt/(2*np.pi)
         self._star.evolve(new_age)
-        self._eos.update(dt, self.Sigma, self._star)
+        self._eos.update(dt, self.Sigma, star=self._star, FUV=self.FUV)
 
     def interp(self, R, data):
         """Interpolate disc data to new radii
