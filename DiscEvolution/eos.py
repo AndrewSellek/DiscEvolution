@@ -51,7 +51,7 @@ class EOS_Table(object):
     def mu(self):
         return self._mu
 
-    def update(self, dt, Sigma, amax=None, star=None):
+    def update(self, dt, Sigma, star=None, amax=None, G_0=None):
         """Update the eos"""
         pass
 
@@ -80,11 +80,11 @@ class LocallyIsothermalEOS(EOS_Table):
     def __init__(self, star, h0, q, alpha_t, mu=2.4):
         super(LocallyIsothermalEOS, self).__init__()
         
-        self._h0 = h0
-        self._cs0 = h0 * star.M**0.5
+        self._h0 = h0                               # Dimensionless
+        self._cs0 = h0 * star.M**0.5                # Earth orbital velocity = 2pi AU/yr = AU/tdyn
         self._q = q
-        self._H0 = h0
-        self._T0 = (AU*Omega0)**2 * mu / GasConst
+        self._H0 = h0                               # AU
+        self._T0 = (AU*Omega0)**2 * mu / GasConst   # cm^2/AU^2 tdyn^2/s^2 g/mol molK/erg = AU^-2 tdyn^2 K
         self._mu = mu
         self._alpha_t = alpha_t
         
@@ -140,7 +140,7 @@ class LocallyIsothermalEOS(EOS_Table):
 class TanhAlphaEOS(LocallyIsothermalEOS):
     """Variant that allows for smooth (tanh) changes in alpha"""
     def __init__(self, star, h0, q, alpha_t, mu=2.4, R_alpha=None, w=1.0, t_trap=-np.inf):
-        super(TanhAlphaEOS, self).__init__(star, h0, q, alpha_t, mu=2.4)
+        super(TanhAlphaEOS, self).__init__(star, h0, q, alpha_t, mu=mu)
         
         self._R_alpha = R_alpha
         self._R_alpha_w = w
@@ -161,7 +161,7 @@ class TanhAlphaEOS(LocallyIsothermalEOS):
         else:
             super(VariableAlphaEOS, self)._f_alpha(R)
 
-    def update(self, dt, Sigma, amax=None, star=None):
+    def update(self, dt, Sigma, star=None, amax=None, G_0=None):
         """Update the eos"""
         if dt>0 and self._t_trap>0:
             self._alpha  = self._f_alpha(self._R, t = star.age)
@@ -171,6 +171,49 @@ class TanhAlphaEOS(LocallyIsothermalEOS):
 
     def smooth_step(self, x, center=0, width=1):
         return 0.5 * (1 + np.tanh((x-center)/width))
+
+class ExternalHeatEOS(LocallyIsothermalEOS):
+    """Variant following Haworth (2021) as parametrized by Sellek et al. (in prep)
+
+    args:
+        h0      : aspect ratio due to Star at 1AU
+        q       : power-law index of sound-speed
+        alpha_t : turbulent alpha parameter
+        star    : stellar properties
+        mu      : mean molecular weight, default=2.4
+        f_FUV   : fraction of external luminosity emitted in FUV, default=0.227
+        G_0     : external FUV field in units of G_0 (1.63*10^-3 erg/s/cm^2)
+    """
+
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, G_0=0.0, f_FUV=0.227):
+        super(ExternalHeatEOS, self).__init__(star, h0, q, alpha_t, mu=mu)
+
+        self._f_FUV = f_FUV
+        self._G_0   = G_0
+        self._Mstar = star.M
+
+    def _f_T(self, R):
+        return (self._T0**4 * self._h0**8 * self._Mstar**0.6 * R**(8*self._q) + 1.63e-3/sig_SB/self._f_FUV * self._G_0)**(1/4)
+
+    def _f_cs(self, R):
+        return np.sqrt(self._f_T(R)/self._T0)
+
+    def _f_H(self, R):
+        return self._f_cs(R) / self._Mstar**0.5 * R**1.5
+
+    def check_T(self, R):
+        i0 = np.argmin(np.abs(self._R-R))
+        print(self._f_T(R), self._f_T(self._R[i0-1:i0+1]), self.T[i0-1:i0+1], self.T[-3:])
+
+    def update(self, dt, Sigma, star=None, amax=None, G_0=None):
+        # Update G_0 and M* if they are passed
+        if G_0 is not None:
+            self._G_0   = G_0
+        if star is not None:
+            self._Mstar = star.M
+        # Recalculate sound speed and scale height profiles
+        self._cs = self._f_cs(self._R)
+        self._H  = self._f_H(self._R)        
 
 _sqrt2pi = np.sqrt(2*np.pi)
 class IrradiatedEOS(EOS_Table):
@@ -222,7 +265,7 @@ class IrradiatedEOS(EOS_Table):
         self._H0  = (Omega0**-1/AU) * (GasConst / (self._mu*self._star.M))**0.5
 
 
-    def update(self, dt, Sigma, amax=1e-5, star=None):
+    def update(self, dt, Sigma, star=None, amax=1e-5, G_0=None):
         if star:
             self._star = star
             self._compute_constants()

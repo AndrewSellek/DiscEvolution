@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from DiscEvolution.constants import Msun, AU, yr, Mjup
 from DiscEvolution.grid import Grid
 from DiscEvolution.star import SimpleStar, PhotoStar
-from DiscEvolution.eos  import IrradiatedEOS, LocallyIsothermalEOS, TanhAlphaEOS
+from DiscEvolution.eos  import IrradiatedEOS, LocallyIsothermalEOS, TanhAlphaEOS, ExternalHeatEOS
 from DiscEvolution.dust import DustGrowthTwoPop
 from DiscEvolution.opacity import Tazzari2016
 from DiscEvolution.viscous_evolution import ViscousEvolution, ViscousEvolutionFV
@@ -124,6 +124,14 @@ def setup_disc(model):
             star = SimpleStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
     except KeyError:
         star = SimpleStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
+
+    # Setup the external FUV irradiation
+    try:
+        p = model['fuv']
+        FUV_field = p['fuv_field']
+    except KeyError:
+        p = model['uv']
+        FUV_field = p['uv_field']
     
     # Setup the equation of state
     p = model['eos']
@@ -144,6 +152,8 @@ def setup_disc(model):
         assert p['opacity'] == 'Tazzari2016'
         kappa = Tazzari2016()
         eos = IrradiatedEOS(star, model['disc']['alpha'], kappa=kappa, mu=mu)
+    elif p['type'] == 'external':
+        eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field)
     elif p['type'] == 'iso':
         if R_alpha:
             eos = TanhAlphaEOS(star, p['h0'], p['q'], 
@@ -188,12 +198,12 @@ def setup_disc(model):
     if model['disc']['d2g'] > 0:
         # If model dust parameters not specified, resort to default
         try:
-            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma,
+            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field,
                     rho_s=model['dust']['density'], Sc=model['disc']['Schmidt'], feedback=feedback, uf_ice=model['dust']['ice_frag_v'], f_grow=model['dust']['f_grow'], distribution_slope=model['dust']['p'])
         except:
-            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, Sc=model['disc']['Schmidt'], feedback=feedback, uf_ice=model['dust']['ice_frag_v'])
+            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field, Sc=model['disc']['Schmidt'], feedback=feedback, uf_ice=model['dust']['ice_frag_v'])
     else:
-        disc = AccretionDisc(grid, star, eos, Sigma=Sigma)
+        disc = AccretionDisc(grid, star, eos, Sigma=Sigma, FUV=FUV_field)
 
     # Setup the chemical part of the disc
     try:
@@ -210,14 +220,6 @@ def setup_disc(model):
             else:
                 disc.chem = setup_init_abund_simple(model, disc)
                 disc.update_ices(disc.chem.ice)
-
-    # Setup the external FUV irradiation
-    try:
-        p = model['fuv']
-        disc.set_FUV(p['fuv_field'])
-    except KeyError:
-        p = model['uv']
-        disc.set_FUV(p['uv_field'])
 
     return disc
 
