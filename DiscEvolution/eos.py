@@ -201,10 +201,6 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
     def _f_H(self, R):
         return self._f_cs(R) / self._Mstar**0.5 * R**1.5
 
-    def check_T(self, R):
-        i0 = np.argmin(np.abs(self._R-R))
-        print(self._f_T(R), self._f_T(self._R[i0-1:i0+1]), self.T[i0-1:i0+1], self.T[-3:])
-
     def update(self, dt, Sigma, star=None, amax=None, G_0=None):
         # Update G_0 and M* if they are passed
         if G_0 is not None:
