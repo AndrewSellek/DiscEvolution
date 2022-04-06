@@ -199,7 +199,7 @@ class AccretionDisc(object):
 
         new_age = self._star.age + dt/(2*np.pi)
         self._star.evolve(new_age)
-        self._eos.update(dt, self.Sigma, star=self._star, FUV=self.FUV)
+        self._eos.update(dt, self.Sigma, star=self._star, G_0=self.FUV)
 
     def interp(self, R, data):
         """Interpolate disc data to new radii

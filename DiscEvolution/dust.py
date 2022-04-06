@@ -135,7 +135,7 @@ class DustyDisc(AccretionDisc):
 
         new_age = self._star.age + dt/(2*np.pi)
         self._star.evolve(new_age)
-        self._eos.update(dt, self.Sigma, star=self._star, amax=self.grain_size[-1], FUV=self.FUV)
+        self._eos.update(dt, self.Sigma, star=self._star, amax=self.grain_size[-1], G_0=self.FUV)
     
     def update_ices(self, chem):
         """Update ice fractions"""
