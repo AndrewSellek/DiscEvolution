@@ -56,7 +56,11 @@ class FRIED_2D(FRIEDInterpolator):
 		self._Mstar = M_star
 		self._UV = UV
 		select_mass = (np.abs(grid_parameters[:,0] - M_star)<0.001) # Filter based on ones with the correct mass
+        if sum(select_mass)==0:
+            raise ValueError("This stellar mass is not in the FRIED grid... currently not set up to interpolate between")
 		select_UV = (np.abs(grid_parameters[:,1] - UV)<0.001) # Filter based on ones with the correct UV
+        if sum(select_UV)==0:
+            raise ValueError("This FUV field is not in the FRIED grid... currently not set up to interpolate between")
 		select_MUV = select_mass * select_UV
 		grid_inputs_2D = grid_parameters[select_MUV,:] # Apply filter
 		self.selected_inputs = grid_inputs_2D[:,(use_keys[0],use_keys[1])]
