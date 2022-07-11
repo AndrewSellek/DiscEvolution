@@ -389,6 +389,24 @@ class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
         header = {}
         return self.__class__.__name__, header
 
+class FRIEDExternalEvaporationfMS(FRIEDExternalEvaporationBase):
+    """
+    External photoevaporation flow with a mass loss rate which is dependent on radius and surface density.
+    Calculated by converting to the mass within 400 AU (M400 ~ R Sigma)
+    """
+
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
+        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
+        self.FRIED_Rates = photorate.FRIED_2DfM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self._density = True
+
+    def ASCII_header(self):
+        return ("# FRIEDExternalEvaporationfMS: {} G0".format(self._FUV))
+
+    def HDF5_attributes(self):
+        header = {}
+        return self.__class__.__name__, header
+
 class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
     """
     External photoevaporation flow with a mass loss rate which is dependent on radius and integrated mass interior.
