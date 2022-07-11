@@ -153,7 +153,11 @@ def setup_disc(model):
         kappa = Tazzari2016()
         eos = IrradiatedEOS(star, model['disc']['alpha'], kappa=kappa, mu=mu)
     elif p['type'] == 'external':
-        eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field)
+        try:
+            T_ext = model['fuv']['T_ext']
+        except KeyError:
+            T_ext = 39000
+        eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field, T_ext=T_ext)
     elif p['type'] == 'iso':
         if R_alpha:
             eos = TanhAlphaEOS(star, p['h0'], p['q'], 

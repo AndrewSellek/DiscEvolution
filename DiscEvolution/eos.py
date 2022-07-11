@@ -1,5 +1,6 @@
 from __future__ import print_function
 import numpy as np
+from scipy.integrate import quad
 from .brent import brentq
 from .constants import GasConst, sig_SB, AU, Omega0
 from . import opacity
@@ -181,14 +182,20 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
         alpha_t : turbulent alpha parameter
         star    : stellar properties
         mu      : mean molecular weight, default=2.4
-        f_FUV   : fraction of external luminosity emitted in FUV, default=0.227
+        T_ext   : blackbody temperature of external FUV source (K), default=39000 (Theta1 Orionis C)
+        #f_FUV   : fraction of external luminosity emitted in FUV, default=0.506    # Now calculated from T_ext
         G_0     : external FUV field in units of G_0 (1.63*10^-3 erg/s/cm^2)
     """
 
-    def __init__(self, star, h0, q, alpha_t, mu=2.4, G_0=0.0, f_FUV=0.227):
+    def Planck(self, nu):
+        return nu**3/(np.exp(nu)-1)
+
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, G_0=0.0, T_ext=39000):
         super(ExternalHeatEOS, self).__init__(star, h0, q, alpha_t, mu=mu)
 
-        self._f_FUV = f_FUV
+        self._hc_kT = 6.63e-27*3.00e10/1.38e-16/T_ext
+        self._f_FUV = quad(self.Planck, self._hc_kT/2400e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
+        print("For T_ext={}, f_FUV={}".format(T_ext, self._f_FUV))
         self._G_0   = G_0
         self._Mstar = star.M
 
@@ -201,10 +208,12 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
     def _f_H(self, R):
         return self._f_cs(R) / self._Mstar**0.5 * R**1.5
 
-    def update(self, dt, Sigma, star=None, amax=None, G_0=None):
-        # Update G_0 and M* if they are passed
+    def update(self, dt, Sigma, star=None, amax=None, G_0=None, T_ext=None):
+        # Update G_0, f_FUV and M* if necessary
         if G_0 is not None:
             self._G_0   = G_0
+        if T_ext is not None:
+            self._f_FUV = quad(self.Planck, self._hc_kT/2400e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
         if star is not None:
             self._Mstar = star.M
         # Recalculate sound speed and scale height profiles
