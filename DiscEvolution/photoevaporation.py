@@ -119,6 +119,7 @@ class ExternalPhotoevaporationBase(object):
             # Record state before removal for calculating abundances/dust fractions 
             Sigma_G0 = disc.Sigma_G
             Sigma_D0 = disc.Sigma_D
+            Sigma_0  = Sigma_G0 + Sigma_D0.sum(0)
             not_dustless = (Sigma_D0.sum(0) > 0)
             f_m = np.zeros_like(disc.Sigma)
             f_m[not_dustless] = disc.dust_frac[1,:].flatten()[not_dustless]/disc.integ_dust_frac[not_dustless]  # Large fraction
@@ -131,6 +132,7 @@ class ExternalPhotoevaporationBase(object):
         # Apply gas loss to Sigma
         dM_evap = dM_dot * dt
         disc._Sigma = np.maximum(disc._Sigma - dM_evap / dA, 0)
+        new_Sigma_G = np.maximum(Sigma_G0 - dM_evap / dA, 0)
         self._Mcum_gas  += dM_evap.sum()  # Record mass loss
         
         if (isinstance(disc,DustyDisc)):
@@ -138,6 +140,7 @@ class ExternalPhotoevaporationBase(object):
             M_ent_w = np.zeros_like(M_ent)
             M_ent_w[(dM_gas > 0)] = M_ent[(dM_gas > 0)] * dM_evap[(dM_gas > 0)] / dM_gas[(dM_gas > 0)]
             disc._Sigma = np.maximum(disc._Sigma - M_ent_w / dA, 0)
+            new_Sigma_D = np.maximum(Sigma_D0.sum(0) - M_ent_w / dA, 0)
             self._Mcum_dust += M_ent_w.sum() # Record mass loss
 
             # Work out composition of wind
@@ -145,32 +148,31 @@ class ExternalPhotoevaporationBase(object):
                 for atom in disc.chem.gas.atomic_abundance().atom_ids:
                     M_ent_ice = np.zeros_like(M_ent)
                     M_ent_gas = np.zeros_like(M_ent)
-                    atom_ice = disc.chem.ice.atomic_abundance()[atom]/disc.chem.ice.total_abund
-                    atom_gas = disc.chem.gas.atomic_abundance()[atom]/(1-disc.chem.ice.total_abund)
-                    M_ent_ice[(dM_gas > 0)] = M_ent_w[(dM_gas > 0)]*atom_ice[(dM_gas > 0)]
-                    M_ent_gas[(dM_gas > 0)] = (dM_evap[(dM_gas > 0)]-M_ent_w[(dM_gas > 0)])*atom_gas[(dM_gas > 0)]
-                    self._Mcum_chem[atom] += np.nansum(M_ent_ice+M_ent_gas)
-                    self._wind_abun[atom]  = np.nansum(M_ent_ice+M_ent_gas)/dM_evap.sum()
-                self._wind_abun['d'] = M_ent_w.sum()/dM_evap.sum()
+                    atom_ice = disc.chem.ice.atomic_abundance()[atom]/disc.chem.ice.total_abund         # Mass abundances of atoms / ice mass = mass fraction in ice
+                    atom_gas = disc.chem.gas.atomic_abundance()[atom]/(1-disc.chem.ice.total_abund)     # Mass abundances of atoms / gas mass = mass fraction in gas
+                    M_ent_ice[(dM_gas > 0)] = M_ent_w[(dM_gas > 0)]*atom_ice[(dM_gas > 0)]              # Mass of atom in removed gas
+                    M_ent_gas[(dM_gas > 0)] = dM_evap[(dM_gas > 0)]*atom_gas[(dM_gas > 0)]              # Mass of atom in removed ice
+                    self._Mcum_chem[atom] += np.nansum(M_ent_ice+M_ent_gas)                             # Cumulative mass lost
+                    self._wind_abun[atom]  = np.nansum(M_ent_ice+M_ent_gas)/np.nansum(M_ent_w+dM_evap)  # Current composition
+                self._wind_abun['d'] = M_ent_w.sum()/np.nansum(M_ent_w+dM_evap)                         # Dust mass fraction in wind
 
-            new_Sigma_G = np.maximum(Sigma_G0 - dM_evap / dA, 0)
-            new_Sigma_D = np.maximum(Sigma_D0.sum(0) - M_ent_w / dA, 0)
-            not_empty = (disc.Sigma > 0)
+            not_empty    = (disc.Sigma > 0)
+            not_gasless  = not_empty * (disc.Sigma_G > 0)
             not_dustless = not_empty * (Sigma_D0.sum(0) > 0)
             if disc.chem:
                 # Update gas abundances
                 for spec in disc.chem.gas.species:
-                    disc.chem.ice[spec][not_empty] *= new_Sigma_G[not_empty] / Sigma_G0[not_empty]
-                    disc.chem.gas[spec][~not_empty] = 0.
+                    disc.chem.gas[spec][not_gasless] *= new_Sigma_G[not_gasless] / Sigma_G0[not_gasless] * Sigma_0[not_gasless] / disc.Sigma[not_gasless]
+                    disc.chem.gas[spec][~not_gasless] = 0.
                 # Update ice abundances
                 for spec in disc.chem.ice.species:
-                    disc.chem.ice[spec][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
+                    disc.chem.ice[spec][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless] * Sigma_0[not_dustless] / disc.Sigma[not_dustless]
                     disc.chem.ice[spec][~not_dustless] = 0.
                 disc.update_ices(disc.chem.ice)
             else:
                 # Update the dust mass fractions directly
-                disc._eps[0][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
-                disc._eps[1][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless]
+                disc._eps[0][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless] * Sigma_0[not_dustless] / disc.Sigma[not_dustless]
+                disc._eps[1][not_dustless] *= new_Sigma_D[not_dustless] / Sigma_D0.sum(0)[not_dustless] * Sigma_0[not_dustless] / disc.Sigma[not_dustless]
                 disc._eps[:,~not_dustless] = 0.
 
     def dust_entrainment(self, disc):

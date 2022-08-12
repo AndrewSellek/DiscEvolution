@@ -139,7 +139,7 @@ class DiscEvolutionDriver(object):
 
             # If we have dust, we should update it now the ice fraction has
             # changed
-            disc.update_ices(disc.chem.ice)
+            disc.update_ices(disc.chem.ice)            
 
         # Pin the values to >= 0 and <=1:
         disc.Sigma[:] = np.maximum(disc.Sigma, 0)        
