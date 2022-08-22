@@ -10,7 +10,6 @@
 import os
 import json
 import numpy as np
-import matplotlib.pyplot as plt
 from DiscEvolution.constants import Msun, AU, yr, Mjup
 from DiscEvolution.grid import Grid
 from DiscEvolution.star import SimpleStar, PhotoStar
