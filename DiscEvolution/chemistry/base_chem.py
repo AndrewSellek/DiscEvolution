@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+import scipy.integrate as integrate
 from ..constants import *
 
 ################################################################################
@@ -207,27 +208,27 @@ class SimpleChemBase(object):
         """Class information for HDF5 headers"""
         return self.__class__.__name__, { "fix_ratios" : self._fix_ratios }
 
-    def equilibrium_chem(self, T, rho, dust_frac, abund):
+    def equilibrium_chem(self, T, rho, dust_frac, f_small, R, SigmaG, abund):
         """Compute the equilibrium chemistry"""
 
-        ice = self.molecular_abundance(T, rho, dust_frac, abund)
+        ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, abund)
         gas = ice.copy()
 
         for spec in ice.species:
-            ice[spec] = self._equilibrium_ice_abund(T, rho, dust_frac,
+            ice[spec] = self._equilibrium_ice_abund(T, rho, dust_frac, f_small, R, SigmaG,
                                                     spec, ice)
             gas[spec] = np.maximum(gas[spec] - ice[spec], 0)
             
         return MolecularIceAbund(gas=gas, ice=ice)
 
 
-    def update(self, dt, T, rho, dust_frac, chem, **kwargs):
+    def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, **kwargs):
 
         if not self._fix_ratios:
             mol_abund  = chem.gas.copy()
             mol_abund += chem.ice
 
-            chem.ice = self.molecular_abundance(T, rho, dust_frac, 
+            chem.ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, 
                                                 mol_abund=mol_abund)
             chem.gas.data[:] = 0
         else:
@@ -237,7 +238,7 @@ class SimpleChemBase(object):
         for spec in chem.ice.species:
             mtot = chem.ice[spec] + chem.gas[spec]
 
-            ice = self._equilibrium_ice_abund(T, rho,  dust_frac,
+            ice = self._equilibrium_ice_abund(T, rho,  dust_frac, f_small, R, SigmaG,
                                               spec, chem.ice)
             chem.ice[spec] = ice
             chem.gas[spec] = np.maximum(mtot - ice, 0)
@@ -257,7 +258,7 @@ class StaticChem(SimpleChemBase):
     def __init__(self, fix_ratios=True):
         super(StaticChem, self).__init__(fix_ratios)
     
-    def _equilibrium_ice_abund(self, T, rho, dust_frac, species, mol_abund):
+    def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, species, mol_abund):
         """Equilibrium ice fracion"""
         return mol_abund[species] * (T < self._T_cond[species])
 
@@ -300,7 +301,7 @@ class ThermalChem(object):
         N_bind = sig_b * 4*np.pi * a**2 * f_bind
         self._etaNbind = eta*N_bind
         
-        # Cache the adsorpsion/desorption coefficients
+        # Cache the thermal adsorption/desorption coefficients
         self._nu0 = np.sqrt(2 * sig_b * k_B / (m_H *np.pi**2))
         self._v0  = np.sqrt(8 * k_B / (m_H * np.pi))
         
@@ -330,14 +331,14 @@ class ThermalChem(object):
         return self.__class__.__name__, head
                      
     def _nu_i(self, Tbind, m_mol):
-        """Desorbtion rate per ice molecule"""
+        """Desorption rate per ice molecule"""
         return self._nu0 * np.sqrt(Tbind/m_mol) 
 
     def _v_therm(self, T, m_mol):
         """Thermal velocity of the species in the gas"""
         return self._v0 * np.sqrt(T/m_mol)
 
-    def _equilibrium_ice_abund(self, T, rho, dust_frac, spec, tot_abund):
+    def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, spec, tot_abund):
 
         if 'grain' in spec:
             return tot_abund[spec]
@@ -357,8 +358,8 @@ class ThermalChem(object):
         
         X_eq = X_t - np.minimum(X_t   * Sd/(Sa + Sd + 1e-300),
                                 X_max * Sd/(Sa + 1e-300))
+
         return X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that dust can't spontaneously generate without nucleation sites
-        
     
     def _update_ice_balance(self, dt, T, rho, dust_frac, spec, abund):
 
@@ -425,6 +426,211 @@ class ThermalChem(object):
         abund.gas[spec] = X_g * m_mol / mu
 
 
+class nonThermalChem(object):
+    """Computes grain thermal and non-thermal adsorption/desorption rates.
+
+    Mixin class, to be used with EquilibriumChem.
+
+    args:
+        sig_b   : Number of binding sites, cm^-2.               default = 1.5e15
+        rho_s   : Grain density, g cm^-3.                       default = 1
+        a       : Mean grain size by area, cm.                  default = 1e-5
+        f_bind  : Fraction of grain covered by binding sites.   default = 1
+        f_stick : Sticking probability.                         default = 1
+        muH     : Mean Atomic weight, in m_H.                   default = 1.28
+    """
+    def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5,
+                 f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True):
+        self._Tbind = { 
+            # From KIDA database
+            'CO' : 1150., 'CH4' : 1300.,
+            'CO2' : 2575., 'H2O' : 5700.,
+            # Fayolle+ (2016), Martin-Domenech+ (2014)
+            'N2'  : 1266,  'NH3' : 2965,
+            }
+                        
+        # Dry CO and N2
+        self._Tbind['CO'] = 850
+        self._Tbind['N2'] = 770 # Fayolle+ (2016)
+
+        # Masses
+        self._m_mol = {}
+
+        # Number of dust grains per nucleus, eta:
+        m_g = 4*np.pi * rho_s * a**3 / 3
+        eta = mu*m_H / m_g
+        
+        # X_max = (d2g) * eta * Nbind
+        #      When X_ice > X_max all first layer binding sites on the
+        #      grain are covered. Thus the desorption rate is limited to be
+        #      proportional to min(X_ice, X_max)
+        N_bind = sig_b * 4*np.pi * a**2 * f_bind
+        self._etaNbind = eta*N_bind
+        
+        # Cache the thermal adsorption/desorption coefficients
+        self._nu0 = np.sqrt(2 * sig_b * k_B / (m_H *np.pi**2))
+        self._v0  = np.sqrt(8 * k_B / (m_H * np.pi))
+        
+        self._f_des = (1/Omega0) 
+        self._f_ads = (1/Omega0) * np.pi*a**2 * f_stick*eta
+        
+        self._mu = mu
+
+        # Fluxes
+        self._flux_CR  = 1e-17                                              # Cosmic rays
+        self._flux_UV  = 1e8*G0                                             # External UV, unattenuated
+        self._flux_XAU = 3.8e30/(1000*1.60e-12)/(4*np.pi*AU**2)*Mstar**2    # X-ray photon flux from star at 1 AU (Flaischlen 2021 LX, average energy 1000 eV)
+
+        # Whole grain heating
+        self._Tmax = 70
+        self._Edep = 0.4*1.60e-13
+        self._f_evap = 1.0
+        self._dN_CO = self._f_evap*self._Edep/(1.38e-23*self._Tbind['CO'])
+        if CR_desorb:
+            self._f_CRw = (1/Omega0) * self._dN_CO / (4*np.pi) / sig_b / 3.16e13 * 1e10 * (a/1e-5) * (self._flux_CR/1.3e-17)**2
+        else:
+            self._f_CRw = 0.0
+
+        # CR Spot heating - Dartois+ (2021)
+        self._alpha_spot = {'CO': 40.1, 'CO2': 21.9, 'H2O': 3.63, 'N2': 40.1, 'NH3': 21.9, 'CH4': 40.1}
+        self._beta_spot  = {'CO': 75.8, 'CO2': 56.3, 'H2O': 3.25, 'N2': 75.8, 'NH3': 56.3, 'CH4': 75.8}
+        self._gamma_spot = {'CO': 0.69, 'CO2': 0.60, 'H2O': 0.57, 'N2': 0.69, 'NH3': 0.60, 'CH4': 0.69}
+        if CR_desorb:
+            self._f_CRs = (1/Omega0) * np.pi*a**2 * eta * (self._flux_CR/3e-17)
+        else:
+            self._f_CRs = 0.0
+
+        # UV photodesorption
+        self._yield_UV = {'CO': 1e-2, 'N2': 1e-2/10, 'CO2': 1e-2/3, 'H2O': 1e-2/3, 'NH3': 1e-2/3, 'CH4': 1e-2/10}
+        if UV_desorb:
+            self._f_UV = (1/Omega0) * np.pi*a**2 * eta
+        else:
+            self._f_UV = 0.0
+
+        # X-ray photodesorption
+        self._Pabs = 0.16
+        self._yield_X = 1
+        if X_desorb:
+            self._f_X = (1/Omega0) * np.pi*a**2 * eta * self._Pabs * self._yield_X
+        else:
+            self._f_X = 0.0
+
+        # Header
+        head = ('sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, '
+                'f_bind: {}, f_stick: {}, muH: {}')
+        self._head = head.format(sig_b, rho_s, a, f_bind, f_stick, mu)
+
+    def ASCII_header(self):
+        """Time dependent chem header"""
+        return (super(nonThermalChem, self).ASCII_header() +
+                ', {}'.format(self._head))
+
+    def HDF5_attributes(self):
+        """Class information for HDF5 headers"""
+        __, head = super(nonThermalChem, self).HDF5_attributes()
+
+        def fmt(item): return [x.strip() for x in item.split(":")]
+
+        head.update(dict([ fmt(item) for item in self._head.split(',') ]))
+
+        return self.__class__.__name__, head
+                     
+    def _nu_i(self, Tbind, m_mol):
+        """Desorption rate per ice molecule"""
+        return self._nu0 * np.sqrt(Tbind/m_mol) 
+
+    def _v_therm(self, T, m_mol):
+        """Thermal velocity of the species in the gas"""
+        return self._v0 * np.sqrt(T/m_mol)
+
+    def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, spec, tot_abund):
+
+        if 'grain' in spec:
+            return tot_abund[spec]
+        if np.max(tot_abund[spec])==0.0:
+            return tot_abund[spec]
+        
+        self._m_mol[spec] = tot_abund.mass(spec)
+        Tbind = self._Tbind[spec]
+        m_mol = self._m_mol[spec]
+        mu = self._mu
+
+        X_t   = tot_abund[spec] * mu / m_mol
+        X_max = self._etaNbind * dust_frac
+        X_vol = 0.0
+        for speci in tot_abund.species:
+            if not 'grain' in speci:
+                X_vol+=tot_abund[speci] * mu / tot_abund.mass(speci)
+
+        n = rho / (mu*m_H)
+        N_vert = SigmaG / (mu*m_H)
+        N_rad  = -integrate.cumtrapz(n[::-1], R[::-1] * AU, initial=-0.0)[::-1] 
+        AV = 1e-21 * np.minimum(N_vert, N_rad)
+
+        # Adsorption & desorption rate per molecule
+        Sa = self._f_ads * self._v_therm(T, m_mol)  * dust_frac * n
+        Sd = self._f_des * self._nu_i(Tbind, m_mol) * np.exp(-Tbind/T)
+        Sw = self._f_CRw * self._nu_i(Tbind, m_mol)/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-Tbind/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small
+        SX = self._f_UV * dust_frac * self._flux_XAU/R**2 * 1/X_vol
+        
+        # Approximate Equilibria
+        X_eq_th  = np.maximum(X_t * Sa/(Sa + Sd + 1e-300), X_t - X_max * Sd/(Sa + 1e-300))
+        X_eq_CRs = self._beta_spot[spec]*X_max*(n*self._v_therm(T, self._m_mol[spec])*X_t/self._alpha_spot[spec])**(1/self._gamma_spot[spec])
+        X_eq_CRw = np.maximum(X_t * Sa/(Sa + Sw + 1e-300), X_t - X_max * Sw/(Sa + 1e-300))
+        X_eq_UV  = 5*X_max*n*self._v_therm(T, self._m_mol[spec])*X_t/(self._yield_UV[spec] * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5)))
+        X_eq_X   = X_t * Sa/(Sa + SX + 1e-300)
+        
+        nLoop = 0        
+        w = 1-1e-15 # Over-relaxation parameter
+        X_eq = np.minimum(X_eq_th, X_eq_CRs)
+        X_eq = np.minimum(X_eq, X_eq_CRw)
+        X_eq = np.minimum(X_eq, X_eq_UV)
+        X_eq = np.minimum(X_eq, X_eq_X)
+        while nLoop<6:
+            dx = self._net_adsorption(X_eq, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol) / self._d_net_adsorption(X_eq, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol)
+            X_eq = X_eq - np.minimum(dx, w * X_eq)
+            nLoop += 1
+
+        return X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that dust can't spontaneously generate without nucleation sites
+        
+    def _net_adsorption(self, X, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol):
+
+        # Thermal adsorption & desorption rate per molecule
+        kappa_ads     = self._f_ads * self._v_therm(T, self._m_mol[spec])  * dust_frac * n * (X_t - X)
+        kappa_des_th  = self._f_des * self._nu_i(self._Tbind[spec], self._m_mol[spec]) * np.exp(-self._Tbind[spec]/T) * np.minimum(X, X_max)
+        
+        # Cosmic ray contributions
+        kappa_des_CRs = self._f_CRs * dust_frac * self._alpha_spot[spec] * (1 - np.exp(-(X/X_max/self._beta_spot[spec])**self._gamma_spot[spec]))
+        kappa_des_CRs += (kappa_des_CRs==0) * self._f_CRs * dust_frac * self._alpha_spot[spec] * (X/X_max/self._beta_spot[spec])**self._gamma_spot[spec]
+        kappa_des_CRw = self._f_CRw * self._nu_i(self._Tbind[spec], self._m_mol[spec])/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-self._Tbind[spec]/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small * np.minimum(X, X_max)
+
+        # UV photodesorption
+        kappa_des_UV  = self._f_UV * dust_frac * self._yield_UV[spec] * (1 - np.exp(-X/X_max/5)) * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5))
+        kappa_des_UV  += (kappa_des_UV==0) * self._f_UV * dust_frac * self._yield_UV[spec] * X/X_max/5 * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5))
+
+        # X-ray photodesorption
+        kappa_des_X   = self._f_UV * dust_frac * self._flux_XAU/R**2 * X/X_vol
+
+        return kappa_ads - kappa_des_th - kappa_des_CRs - kappa_des_CRw - kappa_des_UV - kappa_des_X
+
+    def _d_net_adsorption(self, X, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol):
+
+        # Derivative of thermal adsorption & desorption rate per molecule
+        kappa_ads     = self._f_ads * self._v_therm(T, self._m_mol[spec])  * dust_frac * n * -1
+        kappa_des_th  = self._f_des * self._nu_i(self._Tbind[spec], self._m_mol[spec]) * np.exp(-self._Tbind[spec]/T) * (X < X_max)
+
+        # Cosmic ray contributions
+        kappa_des_CRs = self._f_CRs * dust_frac * self._alpha_spot[spec] * self._gamma_spot[spec] * (X/X_max/self._beta_spot[spec])**(self._gamma_spot[spec]-1) * np.exp(-(X/X_max/self._beta_spot[spec])**self._gamma_spot[spec]) / X_max / self._beta_spot[spec]
+        kappa_des_CRw = self._f_CRw * self._nu_i(self._Tbind[spec], self._m_mol[spec])/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-self._Tbind[spec]/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small * (X < X_max)
+
+        # UV photodesorption
+        kappa_des_UV  = self._f_UV * dust_frac * self._yield_UV[spec] * np.exp(-X/X_max/5) / X_max / 5 * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5))
+
+        # X-ray photodesorption
+        kappa_des_X   = self._f_UV * dust_frac * self._flux_XAU/R**2 * 1/X_vol
+
+        return kappa_ads - kappa_des_th - kappa_des_CRs - kappa_des_CRw - kappa_des_UV - kappa_des_X
+
 
 class TimeDependentChem(ThermalChem,SimpleChemBase):
     """Time dependent model of molecular absorbtion/desorption due to thermal
@@ -434,15 +640,15 @@ class TimeDependentChem(ThermalChem,SimpleChemBase):
         ThermalChem.__init__(self, **kwargs)
         SimpleChemBase.__init__(self)
 
-    def update(self, dt, T, rho, dust_frac, chem, **kwargs):
+    def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, **kwargs):
         """Update the gas/ice abundances"""
         for spec in chem:
             self._update_ice_balance(dt, T, rho, dust_frac, spec, chem)
 
         
-class EquilibriumChem(ThermalChem,SimpleChemBase):
+class EquilibriumChem(nonThermalChem,SimpleChemBase):
     """Equilibrium chemistry, computed as equilibrium of time dependent model.
     """
     def __init__(self, fix_ratios=True, fix_grains=True, **kwargs):
-        ThermalChem.__init__(self, **kwargs)
+        nonThermalChem.__init__(self, **kwargs)
         SimpleChemBase.__init__(self, fix_ratios)

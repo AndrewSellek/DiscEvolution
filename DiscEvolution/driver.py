@@ -131,10 +131,11 @@ class DiscEvolutionDriver(object):
         if self._chemistry:
             rho = disc.midplane_gas_density
             eps = disc.dust_frac.sum(0)
+            f_small = f_small = disc.dust_frac[0]/eps
             grain_size = disc.grain_size[-1]
             T = disc.T
 
-            self._chemistry.update(dt, T, rho, eps, disc.chem, 
+            self._chemistry.update(dt, T, rho, eps, f_small, disc.R, disc.Sigma_G, disc.chem, 
                                    grain_size=grain_size)
 
             # If we have dust, we should update it now the ice fraction has

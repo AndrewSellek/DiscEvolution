@@ -83,7 +83,7 @@ class COChemOberg(object):
 
         return self.__class__.__name__, header
 
-    def molecular_abundance(self, T, rho, dust_frac,
+    def molecular_abundance(self, T, rho, dust_frac, f_small, R, SigmaG,
                             atomic_abund=None, mol_abund=None):
         """Compute the fractions of species present given total abundances
 
@@ -163,7 +163,7 @@ class COChemMadhu(object):
 
         return self.__class__.__name__, header
 
-    def molecular_abundance(self, T, rho, dust_frac,
+    def molecular_abundance(self, T, rho, dust_frac, f_small, R, SigmaG,
                             atomic_abund=None, mol_abund=None):
         """Compute the fractions of species present given total abundances
 
@@ -202,7 +202,7 @@ class COChemMadhu(object):
             
         # Compute the CO2 gas phase fraction (approximately)
         mol_abund['CO2'] = m_tCO2 = 0.1*C*mol_abund.mass('CO2')
-        m_sCO2 = self._equilibrium_ice_abund(T, rho, dust_frac, 'CO2',
+        m_sCO2 = self._equilibrium_ice_abund(T, rho, dust_frac, f_small, R, SigmaG, 'CO2',
                                              mol_abund)
         xCO2 = m_tCO2
         args = m_tCO2 > 0
@@ -304,7 +304,7 @@ if __name__ == "__main__":
     rho = Sigma / (np.sqrt(2*np.pi)*eos.H*AU)
     
     T =  eos.T
-    n = Sigma / (2.4*m_H)
+    n = rho / (2.4*m_H)
 
     
     EQ_chem = SimpleCOChemOberg()
@@ -348,7 +348,7 @@ if __name__ == "__main__":
 
 
     
-    mol_solar = S_chem.molecular_abundance(T, rho, d2g, X_solar)
+    mol_solar = S_chem.molecular_abundance(T, rho, d2g, 1.0, R, Sigma, X_solar)
     
     # Test the time-evolution
     plt.figure()

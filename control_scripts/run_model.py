@@ -235,9 +235,13 @@ def setup_init_abund_simple(model, disc):
 
     # Iterate as the ice fraction changes the dust-to-gas ratio
     for i in range(10):
+
         chem = chemistry.equilibrium_chem(disc.T,
                                           disc.midplane_gas_density,
                                           disc.dust_frac.sum(0),
+                                          disc.dust_frac[0]/disc.dust_frac.sum(0),
+                                          disc.R,
+                                          disc.Sigma_G,
                                           X_solar)
         disc.initialize_dust_density(chem.ice.total_abund)
     return chem
@@ -255,13 +259,13 @@ def get_simple_chemistry_model(model):
     if chem_type == 'TimeDep':
         chemistry = TimeDepCNOChemOberg(a=grain_size)                           #
     elif chem_type == 'Madhu':
-        chemistry = EquilibriumCNOChemMadhu(fix_ratios=False, a=grain_size)     #
+        chemistry = EquilibriumCNOChemMadhu(fix_ratios=False, a=grain_size, G0=model['fuv']['fuv_field'], Mstar=model['star']['mass'], CR_desorb=model['chemistry']['CR_desorb'], UV_desorb=model['chemistry']['UV_desorb'], X_desorb=model['chemistry']['X_desorb'])     #
     elif chem_type == 'Oberg':
-        chemistry = EquilibriumCNOChemOberg(fix_ratios=False, a=grain_size)     #
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=False, a=grain_size, G0=model['fuv']['fuv_field'], Mstar=model['star']['mass'], CR_desorb=model['chemistry']['CR_desorb'], UV_desorb=model['chemistry']['UV_desorb'], X_desorb=model['chemistry']['X_desorb'])     #
     elif chem_type == 'NoReact':
-        chemistry = EquilibriumCNOChemOberg(fix_ratios=True, a=grain_size)      #
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=True,  a=grain_size, G0=model['fuv']['fuv_field'], Mstar=model['star']['mass'], CR_desorb=model['chemistry']['CR_desorb'], UV_desorb=model['chemistry']['UV_desorb'], X_desorb=model['chemistry']['X_desorb'])     #
     else:
-        raise ValueError("Unkown chemical model type")
+        raise ValueError("Unknown chemical model type")
 
     return chemistry
 
