@@ -400,6 +400,11 @@ class DustGrowthTwoPop(DustyDisc):
         super(DustGrowthTwoPop, self).update(dt)
         self.do_grain_growth(dt)
 
+    @property
+    def amin(self):
+        """Minimum grain size in cm"""
+        return self._amin
+
 ################################################################################
 # Radial drift
 ################################################################################

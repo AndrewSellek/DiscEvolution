@@ -9,12 +9,18 @@
 from __future__ import print_function
 import numpy as np
 from .constants import yr
+from .dust import DustGrowthTwoPop
 
 class History(object):
 
     """Setup"""
-    def __init__(self, dust, dthresh, chem):
-        self._threshold = 1e-5          # Threshold for defining edge by density
+    def __init__(self, dust, dthresh, chem, thresh=None):
+        if not thresh is None:
+            self._threshold = thresh    # Define threshold for defining edge by density
+        elif isinstance(dust, DustGrowthTwoPop):
+            self._threshold = dust.amin # Define as where small dust has St~1 (default 1e-5)
+        else:
+            self._threshold = 1e-5      # Default value
         self._dust = dust
         self._chem = chem
         if self._dust:
