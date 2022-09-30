@@ -258,12 +258,20 @@ def get_simple_chemistry_model(model):
         pass
 
     # Non-thermal chemistry
-    if model['chemistry']['CR_desorb'] or model['chemistry']['UV_desorb'] or model['chemistry']['X_desorb']:
+    nonThermal = False
+    nonThermal_dict = {}
+    if 'CR_desorb' in model['chemistry'].keys() and model['chemistry']['CR_desorb']:
         nonThermal = True
-        nonThermal_dict = {'G0': model['fuv']['fuv_field'], 'Mstar': model['star']['mass'], 'CR_desorb': model['chemistry']['CR_desorb'], 'UV_desorb': model['chemistry']['UV_desorb'], 'X_desorb': model['chemistry']['X_desorb'], 'AV_rad': (model['fuv']['photoevaporation'] == "None")}
-    else:
-        nonThermal = False
-        nonThermal_dict = {}
+        nonThermal_dict['CR_desorb']    = model['chemistry']['CR_desorb']
+    if 'UV_desorb' in model['chemistry'].keys() and model['chemistry']['UV_desorb']:
+        nonThermal = True
+        nonThermal_dict['UV_desorb']    = model['chemistry']['UV_desorb']
+        nonThermal_dict['G0']           = model['fuv']['fuv_field']
+        nonThermal_dict['AV_rad']       = (model['fuv']['photoevaporation'] == "None")
+    if 'X_desorb' in model['chemistry'].keys() and model['chemistry']['X_desorb']:
+        nonThermal = True
+        nonThermal_dict['X_desorb']     = model['chemistry']['X_desorb']
+        nonThermal_dict['Mstar']        = model['star']['mass']
     
     if chem_type == 'TimeDep':
         chemistry = TimeDepCNOChemOberg(a=grain_size)
@@ -369,12 +377,12 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         tshield = p['t_shield']
     except:
         tshield = 0
-    if start_time>0:
+    if start_time>0 and p['photoevaporation']!="None":
         _, Mcum_gas  = history.mass
         _, Mcum_dust = history.mass_dust
         Mcum_gas  = Mcum_gas[-1]
         Mcum_dust = Mcum_dust[-1]
-    else:
+    elif p['photoevaporation']!="None":
         Mcum_gas  = 0.0
         Mcum_dust = 0.0
     if (p['photoevaporation'] == "Constant"):

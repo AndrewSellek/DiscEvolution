@@ -94,7 +94,7 @@ class History(object):
         try:
             restartchem = np.genfromtxt(filename.split('/')[0]+'/windcomposition.dat', names=True, comments='#', max_rows=snap_number+1)
         except:
-            restartchem = {}
+            restartchem = None
         
         self._times = restartdata['t']
         print("Restarting with times:\n",self.times)
@@ -157,7 +157,7 @@ class History(object):
                 pass
 
         # Chemistry-Only Parameters
-        if self._chem:
+        if self._chem and not restartchem is None:
             for atom in self._chem.gas.atomic_abundance().atom_ids:
                 try:
                     self._Mcum_chem[atom] = restartchem['M_ext'+atom]
