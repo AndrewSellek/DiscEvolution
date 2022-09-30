@@ -359,7 +359,7 @@ class ThermalChem(object):
         X_eq = X_t - np.minimum(X_t   * Sd/(Sa + Sd + 1e-300),
                                 X_max * Sd/(Sa + 1e-300))
 
-        return X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that dust can't spontaneously generate without nucleation sites
+        return X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
     
     def _update_ice_balance(self, dt, T, rho, dust_frac, spec, abund):
 
@@ -554,7 +554,8 @@ class nonThermalChem(object):
         Sd = self._f_des * self._nu_i(Tbind, m_mol) * np.exp(-Tbind/T)
         Sw = self._f_CRw * self._nu_i(Tbind, m_mol)/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-Tbind/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small
         SX = self._f_UV * dust_frac * self._flux_XAU/R**2 * 1/X_vol
-        
+        SX[(X_vol==0.0)] = 0.0
+                
         # Approximate Equilibria
         X_eq_th  = np.maximum(X_t * Sa/(Sa + Sd + 1e-300), X_t - X_max * Sd/(Sa + 1e-300))
         X_eq_CRs = self._beta_spot[spec]*X_max*(n*self._v_therm(T, self._m_mol[spec])*X_t/self._alpha_spot[spec])**(1/self._gamma_spot[spec])
@@ -571,9 +572,10 @@ class nonThermalChem(object):
         while nLoop<6:
             dx = self._net_adsorption(X_eq, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol) / self._d_net_adsorption(X_eq, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol)
             X_eq = X_eq - np.minimum(dx, w * X_eq)
+            X_eq[(dust_frac==0.0)] = 0.0    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
             nLoop += 1
 
-        return X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that dust can't spontaneously generate without nucleation sites
+        return X_eq * m_mol / mu
         
     def _net_adsorption(self, X, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol):
 
@@ -583,15 +585,18 @@ class nonThermalChem(object):
         
         # Cosmic ray contributions
         kappa_des_CRs = self._f_CRs * dust_frac * self._alpha_spot[spec] * (1 - np.exp(-(X/X_max/self._beta_spot[spec])**self._gamma_spot[spec]))
-        kappa_des_CRs += (kappa_des_CRs==0) * self._f_CRs * dust_frac * self._alpha_spot[spec] * (X/X_max/self._beta_spot[spec])**self._gamma_spot[spec]
+        kappa_des_CRs += (kappa_des_CRs==0) * self._f_CRs * dust_frac * self._alpha_spot[spec] * (X/X_max/self._beta_spot[spec])**self._gamma_spot[spec]  # Where value is small, use Taylor expansion
+        kappa_des_CRs[(X==0.0)] = 0.0
         kappa_des_CRw = self._f_CRw * self._nu_i(self._Tbind[spec], self._m_mol[spec])/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-self._Tbind[spec]/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small * np.minimum(X, X_max)
 
         # UV photodesorption
         kappa_des_UV  = self._f_UV * dust_frac * self._yield_UV[spec] * (1 - np.exp(-X/X_max/5)) * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5))
-        kappa_des_UV  += (kappa_des_UV==0) * self._f_UV * dust_frac * self._yield_UV[spec] * X/X_max/5 * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5))
+        kappa_des_UV  += (kappa_des_UV==0) * self._f_UV * dust_frac * self._yield_UV[spec] * X/X_max/5 * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5))    # Where value is small, use Taylor expansion
+        kappa_des_UV[(X_max==0.0)] = 0.0
 
         # X-ray photodesorption
         kappa_des_X   = self._f_UV * dust_frac * self._flux_XAU/R**2 * X/X_vol
+        kappa_des_X[(X_vol==0.0)] = 0.0
 
         return kappa_ads - kappa_des_th - kappa_des_CRs - kappa_des_CRw - kappa_des_UV - kappa_des_X
 
@@ -603,13 +608,16 @@ class nonThermalChem(object):
 
         # Cosmic ray contributions
         kappa_des_CRs = self._f_CRs * dust_frac * self._alpha_spot[spec] * self._gamma_spot[spec] * (X/X_max/self._beta_spot[spec])**(self._gamma_spot[spec]-1) * np.exp(-(X/X_max/self._beta_spot[spec])**self._gamma_spot[spec]) / X_max / self._beta_spot[spec]
+        kappa_des_CRs[(X==0.0)] = 0.0
         kappa_des_CRw = self._f_CRw * self._nu_i(self._Tbind[spec], self._m_mol[spec])/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-self._Tbind[spec]/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small * (X < X_max)
 
         # UV photodesorption
         kappa_des_UV  = self._f_UV * dust_frac * self._yield_UV[spec] * np.exp(-X/X_max/5) / X_max / 5 * (1000+self._flux_UV*np.power(10,-1.8*AV/2.5))
+        kappa_des_UV[(X_max==0.0)] = 0.0
 
         # X-ray photodesorption
         kappa_des_X   = self._f_UV * dust_frac * self._flux_XAU/R**2 * 1/X_vol
+        kappa_des_X[(X_vol==0.0)] = 0.0
 
         return kappa_ads - kappa_des_th - kappa_des_CRs - kappa_des_CRw - kappa_des_UV - kappa_des_X
 

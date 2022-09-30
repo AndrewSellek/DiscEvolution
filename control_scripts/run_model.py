@@ -89,6 +89,7 @@ def setup_wrapper(model, restart, output=True):
             optically_thin = (disc.R > initial_trunk._Rot)
 
         print("Truncating initial disc at", driver.photoevaporation_external._Rot)
+        print("({} cells)".format(np.sum(optically_thin)))
         disc._Sigma[optically_thin] = 0.
         disc._eps[:,optically_thin] = 0.
         if disc.chem:
@@ -456,7 +457,6 @@ def setup_output(model):
             output_times = np.insert(output_times,0,0) # Prepend 0
 
         # Setup of the plot controller
-        # Setup of the plot controller
         if out['plot'] and out['plot_times']!=[0]:
             plot = np.array([0]+out["plot_times"]) * yr
         elif out['plot']:
@@ -516,10 +516,6 @@ def setup_output(model):
         raise ValueError ("Output format {} not recognized".format(format))
 
     return base_name, EC, output_times / yr
-
-###############################################################################
-# Saving - now moved to the history module
-###############################################################################
 
 ###############################################################################
 # Run

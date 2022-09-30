@@ -131,7 +131,8 @@ class DiscEvolutionDriver(object):
         if self._chemistry:
             rho = disc.midplane_gas_density
             eps = disc.dust_frac.sum(0)
-            f_small = f_small = disc.dust_frac[0]/eps
+            f_small = disc.dust_frac[0]/eps
+            f_small[(eps==0.0)] = 0.0
             grain_size = disc.grain_size[-1]
             T = disc.T
 
