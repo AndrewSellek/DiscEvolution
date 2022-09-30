@@ -255,15 +255,23 @@ def get_simple_chemistry_model(model):
         grain_size = model['chemistry']['fixed_grain_size']
     except KeyError:
         pass
+
+    # Non-thermal chemistry
+    if model['chemistry']['CR_desorb'] or model['chemistry']['UV_desorb'] or model['chemistry']['X_desorb']:
+        nonThermal = True
+        nonThermal_dict = {'G0': model['fuv']['fuv_field'], 'Mstar': model['star']['mass'], 'CR_desorb': model['chemistry']['CR_desorb'], 'UV_desorb': model['chemistry']['UV_desorb'], 'X_desorb': model['chemistry']['X_desorb'], 'AV_rad': (model['fuv']['photoevaporation'] == "None")}
+    else:
+        nonThermal = False
+        nonThermal_dict = {}
     
     if chem_type == 'TimeDep':
-        chemistry = TimeDepCNOChemOberg(a=grain_size)                           #
+        chemistry = TimeDepCNOChemOberg(a=grain_size)
     elif chem_type == 'Madhu':
-        chemistry = EquilibriumCNOChemMadhu(fix_ratios=False, a=grain_size, G0=model['fuv']['fuv_field'], Mstar=model['star']['mass'], CR_desorb=model['chemistry']['CR_desorb'], UV_desorb=model['chemistry']['UV_desorb'], X_desorb=model['chemistry']['X_desorb'])     #
+        chemistry = EquilibriumCNOChemMadhu(fix_ratios=False, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'Oberg':
-        chemistry = EquilibriumCNOChemOberg(fix_ratios=False, a=grain_size, G0=model['fuv']['fuv_field'], Mstar=model['star']['mass'], CR_desorb=model['chemistry']['CR_desorb'], UV_desorb=model['chemistry']['UV_desorb'], X_desorb=model['chemistry']['X_desorb'])     #
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=False, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'NoReact':
-        chemistry = EquilibriumCNOChemOberg(fix_ratios=True,  a=grain_size, G0=model['fuv']['fuv_field'], Mstar=model['star']['mass'], CR_desorb=model['chemistry']['CR_desorb'], UV_desorb=model['chemistry']['UV_desorb'], X_desorb=model['chemistry']['X_desorb'])     #
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=True,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     else:
         raise ValueError("Unknown chemical model type")
 

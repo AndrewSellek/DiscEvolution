@@ -430,6 +430,7 @@ class nonThermalChem(object):
     """Computes grain thermal and non-thermal adsorption/desorption rates.
 
     Mixin class, to be used with EquilibriumChem.
+    EquilibriumChem must also inherit ThermalChem to get the thermal rates
 
     args:
         sig_b   : Number of binding sites, cm^-2.               default = 1.5e15
@@ -440,7 +441,7 @@ class nonThermalChem(object):
         muH     : Mean Atomic weight, in m_H.                   default = 1.28
     """
     def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5,
-                 f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True):
+                 f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True, AV_rad=True):
         self._Tbind = { 
             # From KIDA database
             'CO' : 1150., 'CH4' : 1300.,
@@ -480,6 +481,7 @@ class nonThermalChem(object):
         self._flux_CR  = 1e-17                                              # Cosmic rays
         self._flux_UV  = 1e8*G0                                             # External UV, unattenuated
         self._flux_XAU = 3.8e30/(1000*1.60e-12)/(4*np.pi*AU**2)*Mstar**2    # X-ray photon flux from star at 1 AU (Flaischlen 2021 LX, average energy 1000 eV)
+        self._AV_rad   = AV_rad
 
         # Whole grain heating
         self._Tmax = 70
@@ -520,29 +522,6 @@ class nonThermalChem(object):
                 'f_bind: {}, f_stick: {}, muH: {}')
         self._head = head.format(sig_b, rho_s, a, f_bind, f_stick, mu)
 
-    def ASCII_header(self):
-        """Time dependent chem header"""
-        return (super(nonThermalChem, self).ASCII_header() +
-                ', {}'.format(self._head))
-
-    def HDF5_attributes(self):
-        """Class information for HDF5 headers"""
-        __, head = super(nonThermalChem, self).HDF5_attributes()
-
-        def fmt(item): return [x.strip() for x in item.split(":")]
-
-        head.update(dict([ fmt(item) for item in self._head.split(',') ]))
-
-        return self.__class__.__name__, head
-                     
-    def _nu_i(self, Tbind, m_mol):
-        """Desorption rate per ice molecule"""
-        return self._nu0 * np.sqrt(Tbind/m_mol) 
-
-    def _v_therm(self, T, m_mol):
-        """Thermal velocity of the species in the gas"""
-        return self._v0 * np.sqrt(T/m_mol)
-
     def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, spec, tot_abund):
 
         if 'grain' in spec:
@@ -564,8 +543,11 @@ class nonThermalChem(object):
 
         n = rho / (mu*m_H)
         N_vert = SigmaG / (mu*m_H)
-        N_rad  = -integrate.cumtrapz(n[::-1], R[::-1] * AU, initial=-0.0)[::-1] 
-        AV = 1e-21 * np.minimum(N_vert, N_rad)
+        if self._AV_rad:
+            N_rad  = -integrate.cumtrapz(n[::-1], R[::-1] * AU, initial=-0.0)[::-1] 
+            AV = 1e-21 * np.minimum(N_vert, N_rad)
+        else:
+            AV = 1e-21 * N_vert
 
         # Adsorption & desorption rate per molecule
         Sa = self._f_ads * self._v_therm(T, m_mol)  * dust_frac * n
@@ -633,7 +615,7 @@ class nonThermalChem(object):
 
 
 class TimeDependentChem(ThermalChem,SimpleChemBase):
-    """Time dependent model of molecular absorbtion/desorption due to thermal
+    """Time dependent model of molecular adsorbtion/desorption due to thermal
     processes.
     """
     def __init__(self, **kwargs):
@@ -646,9 +628,22 @@ class TimeDependentChem(ThermalChem,SimpleChemBase):
             self._update_ice_balance(dt, T, rho, dust_frac, spec, chem)
 
         
-class EquilibriumChem(nonThermalChem,SimpleChemBase):
+class EquilibriumChem(ThermalChem,nonThermalChem,SimpleChemBase):
     """Equilibrium chemistry, computed as equilibrium of time dependent model.
     """
-    def __init__(self, fix_ratios=True, fix_grains=True, **kwargs):
-        nonThermalChem.__init__(self, **kwargs)
+    def __init__(self, fix_ratios=True, fix_grains=True, nonThermal=False, nonThermal_dict={}, **kwargs):
+        self._nonThermal = nonThermal
+        if self._nonThermal:
+            nonThermalChem.__init__(self, **nonThermal_dict, **kwargs)
+        else:
+            ThermalChem.__init__(self, **kwargs)
         SimpleChemBase.__init__(self, fix_ratios)
+
+    def _equilibrium_ice_abund(self, *args):
+        if self._nonThermal:
+            ice_abund = nonThermalChem._equilibrium_ice_abund(self, *args)
+        else:
+            ice_abund = ThermalChem._equilibrium_ice_abund(self, *args)
+        return ice_abund
+            
+
