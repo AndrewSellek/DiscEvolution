@@ -441,7 +441,7 @@ class nonThermalChem(object):
         muH     : Mean Atomic weight, in m_H.                   default = 1.28
     """
     def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5,
-                 f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True, AV_rad=True):
+                 f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True, AV_rad=True, CR_rate=1e-17):
         self._Tbind = { 
             # From KIDA database
             'CO' : 1150., 'CH4' : 1300.,
@@ -478,11 +478,11 @@ class nonThermalChem(object):
         self._mu = mu
 
         # Fluxes
-        self._flux_CR  = 1e-17                                              # Cosmic rays
+        self._flux_CR  = CR_rate                                            # Cosmic rays
         self._flux_UV  = 1e8*G0                                             # External UV, unattenuated
         self._flux_XAU = 3.8e30/(1000*1.60e-12)/(4*np.pi*AU**2)*Mstar**2    # X-ray photon flux from star at 1 AU (Flaischlen 2021 LX, average energy 1000 eV)
         self._AV_rad   = AV_rad
-
+        
         # Whole grain heating
         self._Tmax = 70
         self._Edep = 0.4*1.60e-13
@@ -519,8 +519,8 @@ class nonThermalChem(object):
 
         # Header
         head = ('sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, '
-                'f_bind: {}, f_stick: {}, muH: {}')
-        self._head = head.format(sig_b, rho_s, a, f_bind, f_stick, mu)
+                'f_bind: {}, f_stick: {}, muH: {}, flux_X: {} photon/cm^2/s, flux_CR: {}')
+        self._head = head.format(sig_b, rho_s, a, f_bind, f_stick, mu, self._flux_XAU, self._flux_CR)
 
     def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, spec, tot_abund):
 

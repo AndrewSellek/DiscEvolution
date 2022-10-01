@@ -263,6 +263,8 @@ def get_simple_chemistry_model(model):
     if 'CR_desorb' in model['chemistry'].keys() and model['chemistry']['CR_desorb']:
         nonThermal = True
         nonThermal_dict['CR_desorb']    = model['chemistry']['CR_desorb']
+        if 'CR_rate' in model['chemistry'].keys():
+            nonThermal_dict['CR_rate']  = model['chemistry']['CR_rate']
     if 'UV_desorb' in model['chemistry'].keys() and model['chemistry']['UV_desorb']:
         nonThermal = True
         nonThermal_dict['UV_desorb']    = model['chemistry']['UV_desorb']
