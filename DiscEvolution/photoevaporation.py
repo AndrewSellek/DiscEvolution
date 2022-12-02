@@ -93,8 +93,8 @@ class ExternalPhotoevaporationBase(object):
 
         # Weighting function USING GAS MASS
         ot_radii = (disc.R >= self._Rot)
-        s = disc.R**(3/2) * disc.Sigma_G
-        s_tot = np.sum(s[ot_radii])
+        #s = disc.R**(3/2) * disc.Sigma_G
+        s_tot = np.sum(dM_gas[ot_radii])
         s_weight = s/s_tot
         s_weight *= ot_radii # Set weight of all cells inside the maximum to zero.
         M_dot_tot = np.sum(Mdot * s_weight) # Contribution of all cells to mass loss rate
