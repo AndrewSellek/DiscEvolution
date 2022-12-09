@@ -47,8 +47,11 @@ class FRIEDInterpolator(object):
 
 	def PE_rate(self, query_inputs, extrapolate=False):
 		query_log = tuple(np.log10(query_inputs)) # Take logarithm of input values
-		M_dot = self.M_dot_interp(query_log) # Perform the interpolation
-		return np.power(10,M_dot) # Return exponentiated mass rate
+		M_dot = self.M_dot_interp(query_log)      # Perform the interpolation
+		M_dot = np.power(10,M_dot)                # Exponentiate
+		M_dot[(query_inputs[1]<1)]   = 1e-10      # Fix values inside 1 AU (outside FRIED) to FRIED floor
+        #M_dot[(query_inputs[1]>400)] = 1e-10      # Fix values outside 400 AU (outside FRIED) to FRIED floor   ## Can probably do better extrapolating off of R=400 value using M_dot~R*Sigma
+		return M_dot                              # Return exponentiated mass rate
 
 """
 Linear interpolators - using either disc mass (M), surface density (S) or extrapolated mass within 400 au (M400)
@@ -95,7 +98,7 @@ class FRIED_2D(FRIEDInterpolator):
 		ot_regime = low_Sigma * (calc_rates > 1e-10)
 		scaling_factor = (query_inputs[0]/Sigma_min(query_inputs[1],self._Mstar))
 		calc_rates[ot_regime] *= scaling_factor[ot_regime]
-
+		
 		# At high surface densities, clip to top of grid
 		envelope_regime = ( query_inputs[0] > Sigma_max(query_inputs[1],self._Mstar) ) * (query_inputs[1] > 1) * (query_inputs[1] < 400)
 

@@ -91,7 +91,10 @@ def setup_wrapper(model, restart, output=True):
         print("Truncating initial disc at", driver.photoevaporation_external._Rot)
         print("({} cells)".format(np.sum(optically_thin)))
         disc._Sigma[optically_thin] = 0.
-        disc._eps[:,optically_thin] = 0.
+        try:
+            disc._eps[:,optically_thin] = 0.
+        except AttributeError:
+            pass
         if disc.chem:
             #for spec in disc.chem.gas.species:
             #    disc.chem.gas[spec][optically_thin] = 0.
