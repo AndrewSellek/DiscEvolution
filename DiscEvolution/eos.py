@@ -194,7 +194,7 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
         super(ExternalHeatEOS, self).__init__(star, h0, q, alpha_t, mu=mu)
 
         self._hc_kT = 6.63e-27*3.00e10/1.38e-16/T_ext
-        self._f_FUV = quad(self.Planck, self._hc_kT/2070e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
+        self._f_FUV = quad(self.Planck, self._hc_kT/2400e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
         print("For T_ext={}, f_FUV={}".format(T_ext, self._f_FUV))
         self._G_0   = G_0
         self._Mstar = star.M
@@ -213,7 +213,7 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
         if G_0 is not None:
             self._G_0   = G_0
         if T_ext is not None:
-            self._f_FUV = quad(self.Planck, self._hc_kT/2070e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
+            self._f_FUV = quad(self.Planck, self._hc_kT/2400e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
         if star is not None:
             self._Mstar = star.M
         # Recalculate sound speed and scale height profiles
