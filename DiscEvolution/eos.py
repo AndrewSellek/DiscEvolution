@@ -175,6 +175,7 @@ class TanhAlphaEOS(LocallyIsothermalEOS):
 
 class ExternalHeatEOS(LocallyIsothermalEOS):
     """Variant following Haworth (2021) as parametrized by Sellek et al. (in prep)
+    Uses 2400 A as limit for consistency with Haworth papers. 2070 A is also common 
 
     args:
         h0      : aspect ratio due to Star at 1AU
