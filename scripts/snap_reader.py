@@ -26,7 +26,7 @@ class DiscSnap(object):
                     elif line.startswith('# InternalEvaporation'):
                         # Get internal photoevaporation type
                         self._IPE = line.strip().split(',')[1].split(':')[-1]
-                        print(self._IPE)
+                        #print(self._IPE)
                     elif line.startswith('# time'):
                         vars = True
                         # Get the time

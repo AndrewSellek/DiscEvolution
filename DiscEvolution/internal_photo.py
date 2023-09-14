@@ -1079,7 +1079,6 @@ def Sigma_dot_plot():
     #plt.show()
 
     # Plot depletion time
-    """
     plt.figure(figsize=(6,6))
     plt.loglog(R[photoevaporating_E], t_w_E, label='EUV (AA07), $\Phi={}~\mathrm{{s^{{-1}}}}$'.format(1e42), linestyle='--')
     plt.loglog(R[photoevaporating_X], t_w_X, label='X-ray (OEC12), $L_X={}~\mathrm{{erg~s^{{-1}}}}$'.format(1e30))
@@ -1089,10 +1088,9 @@ def Sigma_dot_plot():
     plt.xlabel("R / AU")
     plt.ylabel("$t_w / \mathrm{yr}$")
     plt.xlim([0.1,1000])
-    plt.ylim([1e4,1e12])
-    plt.legend()
+    plt.ylim([1e5,1e9])
+    #plt.legend()
     plt.show()
-    """
 
 if __name__ == "__main__":
     # Set extra things
