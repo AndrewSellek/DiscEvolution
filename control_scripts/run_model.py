@@ -382,6 +382,10 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         tshield = p['t_shield']
     except:
         tshield = 0
+    try:
+        evolvedDust = p['dust']=="evolved"
+    except:
+        evolvedDust = True
     if start_time>0 and p['photoevaporation']!="None":
         _, Mcum_gas  = history.mass
         _, Mcum_dust = history.mass_dust
@@ -394,7 +398,7 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         photoevap = photoevaporation.FixedExternalEvaporation(disc, 1e-9, tshield)
     elif (p['photoevaporation'] == "FRIED" and disc.FUV>0):
         # Using 2DMS at 400 au
-        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc, tshield=tshield, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc, tshield=tshield, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, evolvedDust = evolvedDust)
     elif (p['photoevaporation'] == "FRIED" and disc.FUV<=0):
         photoevap = None
     elif (p['photoevaporation'] == "Integrated"):

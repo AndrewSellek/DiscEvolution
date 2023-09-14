@@ -313,12 +313,13 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
         tshield : A delay to the onset of photoevaporation in yr (in development)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None, evolvedDust=True):
         self._Mdot = 0.0
         self._tshield = tshield * yr
         self._amax = amax * np.zeros_like(disc.R)
         self._FUV = disc.FUV
         self._Rot = max(disc.R)
+        self._evolvedDust = evolvedDust
 
         self._Mcum_gas  = Mcum_gas
         self._Mcum_dust = Mcum_dust
@@ -349,6 +350,8 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
             calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( integ_mass[not_empty], disc.R[not_empty] ))
         norate = np.isnan(calc_rates)
         calc_rates[norate] = 1e-10
+        if not self._evolvedDust:
+            calc_rates[(calc_rates>1e-10)] = calc_rates[(calc_rates>1e-10)]/10
         return calc_rates
 
     def max_size_entrained(self, disc):
@@ -360,8 +363,8 @@ class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
     """External photoevaporation flow with a mass loss rate which is dependent on radius and surface density.
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
-        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
+    def __init__(self, disc, **kwargs):
+        super().__init__(disc, **kwargs)
         self.FRIED_Rates = photorate.FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
@@ -378,8 +381,8 @@ class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
     Calculated by converting to the mass within 400 AU (M400 ~ R Sigma)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
-        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
+    def __init__(self, disc, **kwargs):
+        super().__init__(disc, **kwargs)
         self.FRIED_Rates = photorate.FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
@@ -396,8 +399,8 @@ class FRIEDExternalEvaporationfMS(FRIEDExternalEvaporationBase):
     Calculated by converting to the mass within 400 AU (M400 ~ R Sigma)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
-        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
+    def __init__(self, disc, **kwargs):
+        super().__init__(disc, **kwargs)
         self.FRIED_Rates = photorate.FRIED_2DfM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
@@ -414,8 +417,8 @@ class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
     Calculated by converting to the mass within 400 AU (M400 ~ M / R)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None):
-        super().__init__(disc, tshield=tshield, amax=amax, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, Mcum_chem = Mcum_chem)
+    def __init__(self, disc, **kwargs):
+        super().__init__(disc, **kwargs)
         self.FRIED_Rates = photorate.FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = False
 

@@ -193,7 +193,7 @@ class FRIED_2DfM400S(FRIED_2DfM400):
 		else:
 			re_Sigma = query_inputs[0]
 		# Convert sigma to a disc mass at 400 AU (for 1/R profile) and replace in query
-		fMass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Msun) * self._Mstar
+		fMass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Msun * self._Mstar)
 		new_query[0] = fMass_400 # Replace first query parameter with mass
 		# Calculate rates
 		calc_rates =  super().PE_rate(new_query)

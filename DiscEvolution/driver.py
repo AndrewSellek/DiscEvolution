@@ -77,7 +77,7 @@ class DiscEvolutionDriver(object):
         if self._external_photo and hasattr(self._external_photo,"_density"): # If we are using density to calculate mass loss rates, we need to limit the time step based on photoevaporation
             (dM_dot, dM_gas) = self._external_photo.optically_thin_weighting(disc)
             Dt = dM_gas[(dM_dot>0)] / dM_dot[(dM_dot>0)]
-            Dt_min = np.min(Dt)
+            Dt_min = np.nanmin(Dt)
             dt = min(dt,Dt_min)
         
 	    # Determine tracers for dust step

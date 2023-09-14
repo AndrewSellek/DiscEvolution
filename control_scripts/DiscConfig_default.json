@@ -57,7 +57,8 @@
 "photoevaporation" : "None",
 "fuv_field" : 0,
 "t_shield" : -1,
-"T_ext" : 39000
+"T_ext" : 39000,
+"dust" : "evolved"
 },
 
 "dust" : {
