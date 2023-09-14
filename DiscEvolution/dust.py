@@ -118,8 +118,10 @@ class DustyDisc(AccretionDisc):
         radii = {}
         for thresh in thresholds:
             outside = M_cum > (M_cum[-1] * thresh)
-            R_outer = self.R[outside][0]
-            radii[thresh] = R_outer
+            if np.sum(outside)>0:
+                radii[thresh] = self.R[outside][0]
+            else:
+                radii[thresh] = np.nan
         return radii
 
     def Mdust(self):

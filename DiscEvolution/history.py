@@ -240,7 +240,7 @@ class History(object):
         disc_masses, gas_wind = self.mass
 
         # 3 Dust
-        if driver.dust:
+        if self._dust:
             dust_radii = self.radii_dust
             dust_masses, dust_wind = self.mass_dust
 
@@ -258,7 +258,7 @@ class History(object):
         outputdata = np.column_stack((used_times, disc_masses))
         head  = ['t','M_D']
         units = ['yr','g']
-        if driver.dust:
+        if self._dust:
             outputdata = np.column_stack((outputdata, dust_masses))
             head.append('M_d')
             units.append('g')
@@ -267,7 +267,7 @@ class History(object):
             outputdata = np.column_stack((outputdata, radii))
             head.append(key)
             units.append('AU')
-        if driver.dust:
+        if self._dust:
             for key, radii in dust_radii.items():
                 outputdata = np.column_stack((outputdata, radii))
                 head.append('R_{}'.format(int(float(key)*100)))
@@ -286,7 +286,7 @@ class History(object):
             outputdata = np.column_stack((outputdata, gas_wind))
             head.append('M_extg')
             units.append('g')
-        if driver.photoevaporation_external and driver.dust:
+        if driver.photoevaporation_external and self._dust:
             outputdata = np.column_stack((outputdata, dust_wind))
             head.append('M_extd')
             units.append('g')
