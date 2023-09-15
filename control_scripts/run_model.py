@@ -151,10 +151,13 @@ def setup_disc(model):
             R_alpha = None
     if R_alpha:
         assert len(model['disc']['alpha']) - len(R_alpha) == 1, "Need to specify one fewer radius than alpha value."
-    if model['perturbation']['Type']!="None":
-        perturbation = True
-        ptbn_kwargs = model['perturbation']
-    else:
+    try:
+        if model['perturbation']['Type']!="None":
+            perturbation = True
+            ptbn_kwargs = model['perturbation']
+        else:
+            perturbation = False
+    except:
         perturbation = False
     if p['type'] == 'irradiated':
         assert p['opacity'] == 'Tazzari2016'
@@ -199,8 +202,9 @@ def setup_disc(model):
         except:
             gamma_visc = 1.5 + 2 * model['eos']['q'] # Set gamma to steady state
         Sigma = 1.0 / (grid.Rc**gamma_visc)          # R^-gamma Power Law
-    if perturbation and ptbn_kwargs["Initial"]:
-        Sigma = eos.update(0, Sigma)                                # Divide out perturbation profile is required
+    if perturbation:
+        if ptbn_kwargs["Initial"]:
+            Sigma = eos.update(0, Sigma)                            # Divide out perturbation profile is required
     else:
         eos.update(0, Sigma)
     Sigma *= p['mass'] / np.trapz(Sigma, np.pi*grid.Rc**2)          # Normalise to correct mass
