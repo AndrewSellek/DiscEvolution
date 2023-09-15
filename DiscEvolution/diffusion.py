@@ -44,7 +44,7 @@ class TracerDiffusion(object):
         returns:
             flux_diffuse : diffusive flux at edges (between cells only)
         """
-        D = disc.nu / Sc
+        D = disc.nu_diff / Sc
         Sigma_G = disc.Sigma_G
 
         # Use geometric average to avoid problems at the edge of evaporating
@@ -65,7 +65,7 @@ class TracerDiffusion(object):
     def max_timestep(self, disc, Sc=None):
         """Courant limited time-step"""
         grid = disc.grid
-        D = disc.nu / self._get_Schmidt(disc, Sc)
+        D = disc.nu_diff / self._get_Schmidt(disc, Sc)
 
         return (0.25 * np.diff(grid.Re)**2 / D).min()
 

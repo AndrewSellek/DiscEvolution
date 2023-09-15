@@ -151,6 +151,11 @@ def setup_disc(model):
             R_alpha = None
     if R_alpha:
         assert len(model['disc']['alpha']) - len(R_alpha) == 1, "Need to specify one fewer radius than alpha value."
+    if model['perturbation']['Type']!="None":
+        perturbation = True
+        ptbn_kwargs = model['perturbation']
+    else:
+        perturbation = False
     if p['type'] == 'irradiated':
         assert p['opacity'] == 'Tazzari2016'
         kappa = Tazzari2016()
@@ -160,11 +165,17 @@ def setup_disc(model):
             T_ext = model['fuv']['T_ext']
         except KeyError:
             T_ext = 39000
-        eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field, T_ext=T_ext)
+        if perturbation:
+            eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field, T_ext=T_ext)
+        else:
+            eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field, T_ext=T_ext, ptbn_kwargs=ptbn_kwargs)
     elif p['type'] == 'iso':
         if R_alpha:
             eos = TanhAlphaEOS(star, p['h0'], p['q'], 
                                    model['disc']['alpha'], mu=mu, R_alpha=R_alpha)
+        elif perturbation:
+            eos = LocallyIsothermalEOS(star, p['h0'], p['q'], 
+                                   model['disc']['alpha'], mu=mu, ptbn_kwargs=ptbn_kwargs)        
         else:
             eos = LocallyIsothermalEOS(star, p['h0'], p['q'], 
                                    model['disc']['alpha'], mu=mu)
@@ -186,15 +197,18 @@ def setup_disc(model):
         try:
             gamma_visc = model['disc']['gamma']
         except:
-            gamma_visc = 1.5 + 2 * model['eos']['q']               # Set gamma to steady state
-        Sigma = 1.0 / (grid.Rc**gamma_visc)                        # R^-gamma Power Law
-    Sigma *= p['mass'] / np.trapz(Sigma, np.pi*grid.Rc**2)
-    if (p['unit']=='jup'):          # Disc mass given in Jupiter masses
+            gamma_visc = 1.5 + 2 * model['eos']['q'] # Set gamma to steady state
+        Sigma = 1.0 / (grid.Rc**gamma_visc)          # R^-gamma Power Law
+    if perturbation and ptbn_kwargs["Initial"]:
+        Sigma = eos.update(0, Sigma)                                # Divide out perturbation profile is required
+    else:
+        eos.update(0, Sigma)
+    Sigma *= p['mass'] / np.trapz(Sigma, np.pi*grid.Rc**2)          # Normalise to correct mass
+    if (p['unit']=='jup'):                                          # Disc mass given in Jupiter masses
         Sigma *= Mjup / AU**2
-    elif (p['unit']=='sol'):        # Disc mass given in Solar masses
+    elif (p['unit']=='sol'):                                        # Disc mass given in Solar masses
         Sigma *= Msun / AU**2
 
-    eos.update(0, Sigma)
 
     try:
         feedback = model['disc']['feedback']

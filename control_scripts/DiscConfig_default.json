@@ -85,6 +85,13 @@
 "CR_desorb" : false,
 "UV_desorb" : false,
 "X_desorb"  : false
-}
+},
+
+"perturbation" : {
+"Type"   : "None",
+"Amplitude" : 10.0,
+"Radius" : 5.0,
+"Width"  : 1.0,
+"Initial" : false
 
 }

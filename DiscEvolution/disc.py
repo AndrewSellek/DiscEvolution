@@ -139,6 +139,10 @@ class AccretionDisc(object):
     @property
     def nu(self):
         return self._eos.nu
+        
+    @property
+    def nu_diff(self):
+        return self._eos.nu_diff
     
     @property
     def Re(self):

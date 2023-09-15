@@ -13,9 +13,26 @@ class EOS_Table(object):
     Stores pre-computed temperatures, viscosities etc. Derived classes need to
     provide the funcitons called by set_grid.
     """
-    def __init__(self):
+    def __init__(self, ptbn_kwargs={"Type":"None"}):
         self._gamma = 1.0
         self._mu    = 2.4
+        
+        # Set static ptbn
+        if ptbn_kwargs["Type"]=='Gaussian':
+            print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
+            self._ptbn  = self._f_Gaussian_ptbn
+            self._ptbn_amplitude = ptbn_kwargs['Amplitude']
+            self._ptbn_radius = ptbn_kwargs['Radius']
+            self._ptbn_width = ptbn_kwargs['Width']
+        elif ptbn_kwargs["Type"]=='Kanagawa':
+            print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
+            self._ptbn  = self._f_Kanagawa_ptbn
+        elif ptbn_kwargs["Type"]!="None":
+            print(ptbn_kwargs["Type"], "perturbation not recognised, default to None")
+            self._ptbn  = self._f_no_ptbn
+        else:
+            print("Initialising with no perturbation")
+            self._ptbn  = self._f_no_ptbn
     
     def set_grid(self, grid):
         self._R      = grid.Rc
@@ -26,7 +43,16 @@ class EOS_Table(object):
         self._cs     = self._f_cs(R)
         self._H      = self._f_H(R)
         self._alpha  = self._f_alpha(R)
-        self._nu     = self._f_nu(R)
+        self._nu_diff, self._nu_eff = self._f_nu(R)
+        
+    def _f_no_ptbn(self, R):
+        return np.ones_like(R)
+        
+    def _f_Gaussian_ptbn(self, R):
+        return 1.+(self._ptbn_amplitude-1.)*np.exp(-0.5*np.power(R-self._ptbn_radius,2)/np.power(self._ptbn_width*self._f_H(self._ptbn_radius),2))
+
+    def _f_Kanagawa_ptbn(self, R):
+        raise NotImplementedError
 
     @property
     def cs(self):
@@ -37,12 +63,24 @@ class EOS_Table(object):
         return self._H
 
     @property
-    def nu(self):
-        return self._nu
-
-    @property
     def alpha(self):
         return self._alpha
+
+    @property
+    def nu(self):
+        return self._nu_eff
+        
+    @property
+    def nu_eff(self):
+        return self._nu_eff
+        
+    @property
+    def nu_diff(self):
+        return self._nu_diff
+        
+    @property
+    def perturbation(self):
+        return self._ptbn
 
     @property
     def gamma(self):
@@ -54,13 +92,14 @@ class EOS_Table(object):
 
     def update(self, dt, Sigma, star=None, amax=None, G_0=None):
         """Update the eos"""
-        pass
+        # Return Sigma divided by pertubation - only used in initial conditions
+        return Sigma/self._ptbn(self._R)
 
     def ASCII_header(self):
         """Print eos header"""
-        head = '# {} gamma: {}, mu: {}'
+        head = '# {} gamma: {}, mu: {}, ptbn: {}'
         return head.format(self.__class__.__name__,
-                           self.gamma, self.mu)
+                           self.gamma, self.mu, self._ptbn)
 
     def HDF5_attributes(self):
         """Class information for HDF5 headers"""
@@ -78,8 +117,8 @@ class LocallyIsothermalEOS(EOS_Table):
         star    : stellar properties
         mu      : mean molecular weight, default=2.4
     """
-    def __init__(self, star, h0, q, alpha_t, mu=2.4):
-        super(LocallyIsothermalEOS, self).__init__()
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, ptbn_kwargs={"Type":"None"}):
+        super(LocallyIsothermalEOS, self).__init__(ptbn_kwargs=ptbn_kwargs)
         
         self._h0 = h0                               # Dimensionless
         self._cs0 = h0 * star.M**0.5                # Earth orbital velocity = 2pi AU/yr = AU/tdyn
@@ -96,7 +135,8 @@ class LocallyIsothermalEOS(EOS_Table):
         return self._H0 * R**(1.5+self._q)
     
     def _f_nu(self, R):
-        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R)
+        # Returns diffusive and total effective viscosities
+        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R), self._f_alpha(R) * self._f_cs(R) * self._f_H(R) * self._ptbn(R)
 
     def _f_alpha(self, R):
         """Handle being passed a list of alphas
@@ -140,15 +180,16 @@ class LocallyIsothermalEOS(EOS_Table):
 
 class TanhAlphaEOS(LocallyIsothermalEOS):
     """Variant that allows for smooth (tanh) changes in alpha"""
-    def __init__(self, star, h0, q, alpha_t, mu=2.4, R_alpha=None, w=1.0, t_trap=-np.inf):
-        super(TanhAlphaEOS, self).__init__(star, h0, q, alpha_t, mu=mu)
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, R_alpha=None, w=1.0, t_trap=-np.inf, ptbn_kwargs={"Type":"None"}):
+        super(TanhAlphaEOS, self).__init__(star, h0, q, alpha_t, mu=mu,ptbn_kwargs=ptbn_kwargs)
         
         self._R_alpha = R_alpha
         self._R_alpha_w = w
         self._t_trap = t_trap
 
     def _f_nu(self, R, t=0):
-        return self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R)
+        # Return Sigma divided by pertubation - only used in initial conditions
+        return self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R), self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R) * self._ptbn(R)
 
     def _f_alpha(self, R, t=0):
         if self._R_alpha:
@@ -166,9 +207,9 @@ class TanhAlphaEOS(LocallyIsothermalEOS):
         """Update the eos"""
         if dt>0 and self._t_trap>0:
             self._alpha  = self._f_alpha(self._R, t = star.age)
-            self._nu     = self._f_nu(self._R, t = star.age)
-        else:
-            pass
+            self._nu_diff, self._nu_eff = self._f_nu(self._R, t = star.age)
+        # Return Sigma divided by pertubation - only used in initial conditions
+        return Sigma/self._ptbn(self._R)
 
     def smooth_step(self, x, center=0, width=1):
         return 0.5 * (1 + np.tanh((x-center)/width))
@@ -191,8 +232,8 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
     def Planck(self, nu):
         return nu**3/(np.exp(nu)-1)
 
-    def __init__(self, star, h0, q, alpha_t, mu=2.4, G_0=0.0, T_ext=39000):
-        super(ExternalHeatEOS, self).__init__(star, h0, q, alpha_t, mu=mu)
+    def __init__(self, star, h0, q, alpha_t, mu=2.4, G_0=0.0, T_ext=39000, ptbn_kwargs={"Type":"None"}):
+        super(ExternalHeatEOS, self).__init__(star, h0, q, alpha_t, mu=mu, ptbn_kwargs=ptbn_kwargs)
 
         self._hc_kT = 6.63e-27*3.00e10/1.38e-16/T_ext
         self._f_FUV = quad(self.Planck, self._hc_kT/2400e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
@@ -217,9 +258,10 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
             self._f_FUV = quad(self.Planck, self._hc_kT/2400e-8, self._hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
         if star is not None:
             self._Mstar = star.M
-        # Recalculate sound speed and scale height profiles
-        self._cs = self._f_cs(self._R)
-        self._H  = self._f_H(self._R)        
+        # Recalculate sound speed, scale height and viscosity profiles
+        self._set_arrays()
+        # Return Sigma divided by pertubation - only used in initial conditions
+        return Sigma/self._ptbn(self._R)
 
 _sqrt2pi = np.sqrt(2*np.pi)
 class IrradiatedEOS(EOS_Table):
@@ -240,8 +282,8 @@ class IrradiatedEOS(EOS_Table):
     """
     def __init__(self, star, alpha_t, Tc=10, Tmax=1500., mu=2.4, gamma=1.4,
                  kappa=None,
-                 accrete=True, tol=None): # tol is no longer used
-        super(IrradiatedEOS, self).__init__()
+                 accrete=True, tol=None, ptbn_kwargs={"Type":"None"}): # tol is no longer used
+        super(IrradiatedEOS, self).__init__(ptbn_kwargs=ptbn_kwargs)
 
         self._star = star
         
@@ -344,6 +386,8 @@ class IrradiatedEOS(EOS_Table):
         
         self._set_arrays()
 
+        # Return Sigma divided by pertubation - only used in initial conditions
+        return Sigma/self._ptbn(self._R)
 
     def set_grid(self, grid):
         self._R = grid.Rc
@@ -363,7 +407,8 @@ class IrradiatedEOS(EOS_Table):
         return self.__H(R, self._T)
     
     def _f_nu(self, R):
-        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R)
+        # Returns diffusive and total effective viscosities
+        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R), self._f_alpha(R) * self._f_cs(R) * self._f_H(R) * self._ptbn(R)
 
     def _f_alpha(self, R):
         """Handle being passed a list of alphas
