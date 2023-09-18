@@ -2,7 +2,7 @@ from __future__ import print_function
 import numpy as np
 from scipy.integrate import quad
 from .brent import brentq
-from .constants import GasConst, sig_SB, AU, Omega0
+from .constants import GasConst, sig_SB, AU, Omega0, Msun, Mjup, Mearth
 from . import opacity
 ################################################################################
 # Thermodynamics classes
@@ -27,6 +27,9 @@ class EOS_Table(object):
         elif ptbn_kwargs["Type"]=='Kanagawa':
             print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
             self._ptbn  = self._f_Kanagawa_ptbn
+            self._Mp = ptbn_kwargs['Planet Mass']   # Earth units
+            self._Ms = ptbn_kwargs['Star Mass']     # Solar units
+            self._Rp = ptbn_kwargs['Radius']
         elif ptbn_kwargs["Type"]!="None":
             print(ptbn_kwargs["Type"], "perturbation not recognised, default to None")
             self._ptbn  = self._f_no_ptbn
@@ -44,14 +47,37 @@ class EOS_Table(object):
         self._H      = self._f_H(R)
         self._alpha  = self._f_alpha(R)
         self._nu_diff, self._nu_eff = self._f_nu(R)
-        
+
     def _f_no_ptbn(self, R):
         return np.ones_like(R)
         
     def _f_Gaussian_ptbn(self, R):
         return 1.+(self._ptbn_amplitude-1.)*np.exp(-0.5*np.power(R-self._ptbn_radius,2)/np.power(self._ptbn_width*self._f_H(self._ptbn_radius),2))
 
+    # Define auxiliary functions for Kanagawa prescription
+    def K_Kanagawa(self, R):
+        K_R = np.power((self._Mp*Mearth)/(self._Ms*Msun), 2) * np.power(self._H/R, -5) / self._f_alpha(R)
+        return K_R[np.argmin(np.abs(R-self._Rp))]
+    def Kprime_Kanagawa(self, R):
+        K_R = np.power((self._Mp*Mearth)/(self._Ms*Msun), 2) * np.power(self._H/R, -3) / self._f_alpha(R)
+        return K_R[np.argmin(np.abs(R-self._Rp))]
+    def DR1_Kanagawa(self, R):
+        return (self.amplitude_Kanagawa(R)/4+0.08)*self.Kprime_Kanagawa(R)**0.25*self._Rp
+    def DR2_Kanagawa(self, R):
+        return 0.33*self.Kprime_Kanagawa(R)**0.25*self._Rp
+    def amplitude_Kanagawa(self, R):
+        # This is for Sigma, so the viscosity profile needs 1/(this value)
+        return 1/(1+0.04*self.K_Kanagawa(R))
+
     def _f_Kanagawa_ptbn(self, R):
+        # Kanagawa et al. 2017 based on their 2015 and 2016 studies of depth and width respectively
+        profile = np.ones_like(R)
+        profile[(np.abs(R-self._Rp)<self.DR2_Kanagawa(R))] = 1/(4.0*np.power(self.Kprime_Kanagawa(R),-1/4)*np.abs(R-self._Rp)/self._Rp-0.32)[(np.abs(R-self._Rp)<self.DR2_Kanagawa(R))]
+        profile[(np.abs(R-self._Rp)<self.DR1_Kanagawa(R))] = 1/self.amplitude_Kanagawa(R)
+        return profile
+        
+    def _f_Duffell_ptbn(self, R):
+        # https://ui.adsabs.harvard.edu/abs/2020ApJ...889...16D/abstract
         raise NotImplementedError
 
     @property

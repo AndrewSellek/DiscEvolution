@@ -155,6 +155,7 @@ def setup_disc(model):
         if model['perturbation']['Type']!="None":
             perturbation = True
             ptbn_kwargs = model['perturbation']
+            ptbn_kwargs['Star Mass'] = model['star']['mass']
         else:
             perturbation = False
     except:
