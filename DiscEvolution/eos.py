@@ -24,12 +24,37 @@ class EOS_Table(object):
             self._ptbn_amplitude = ptbn_kwargs['Amplitude']
             self._ptbn_radius = ptbn_kwargs['Radius']
             self._ptbn_width = ptbn_kwargs['Width']
+            try:
+                self._growth_scaling = ptbn_kwargs['Growth Scaling']    # 1/2 = 2D Bondi Pebble; 2/3 = 2D Hill Pebble/Oligarchic Planetestimal; 1 = 3D Pebble/Hill Gas; 4/3 = Runaway Planetesimal; 3 = Bondi Gas
+                self._growth_timescale = ptbn_kwargs['Growth Timescale']  
+                self._growth_endtime = ptbn_kwargs['Growth Endtime']  
+            except KeyError:
+                self._growth_scaling = None
         elif ptbn_kwargs["Type"]=='Kanagawa':
             print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
             self._ptbn  = self._f_Kanagawa_ptbn
             self._Mp = ptbn_kwargs['Planet Mass']   # Earth units
             self._Ms = ptbn_kwargs['Star Mass']     # Solar units
             self._Rp = ptbn_kwargs['Radius']
+            try:
+                self._growth_scaling = ptbn_kwargs['Growth Scaling']    # 1/2 = 2D Bondi Pebble; 2/3 = 2D Hill Pebble/Oligarchic Planetestimal; 1 = 3D Pebble/Hill Gas; 4/3 = Runaway Planetesimal; 3 = Bondi Gas
+                self._growth_timescale = ptbn_kwargs['Growth Timescale']  
+                self._growth_endtime = ptbn_kwargs['Growth Endtime']  
+            except KeyError:
+                self._growth_scaling = None
+        elif ptbn_kwargs["Type"]=='Duffell':
+            print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
+            raise NotImplementedError
+            self._ptbn  = self._f_Duffell_ptbn
+            self._Mp = ptbn_kwargs['Planet Mass']   # Earth units
+            self._Ms = ptbn_kwargs['Star Mass']     # Solar units
+            self._Rp = ptbn_kwargs['Radius']
+            try:
+                self._growth_scaling = ptbn_kwargs['Growth Scaling']    # 1/2 = 2D Bondi Pebble; 2/3 = 2D Hill Pebble/Oligarchic Planetestimal; 1 = 3D Pebble/Hill Gas; 4/3 = Runaway Planetesimal; 3 = Bondi Gas
+                self._growth_timescale = ptbn_kwargs['Growth Timescale']  
+                self._growth_endtime = ptbn_kwargs['Growth Endtime']  
+            except KeyError:
+                self._growth_scaling = None
         elif ptbn_kwargs["Type"]!="None":
             print(ptbn_kwargs["Type"], "perturbation not recognised, default to None")
             self._ptbn  = self._f_no_ptbn
@@ -41,42 +66,52 @@ class EOS_Table(object):
         self._R      = grid.Rc
         self._set_arrays()
 
-    def _set_arrays(self):
+    def _set_arrays(self, t=0):
         R  = self._R
         self._cs     = self._f_cs(R)
         self._H      = self._f_H(R)
         self._alpha  = self._f_alpha(R)
-        self._nu_diff, self._nu_eff = self._f_nu(R)
+        self._nu_diff, self._nu_eff = self._f_nu(R, t=t)
+        
+    def _f_growth(self, t=0):
+        if self._growth_scaling is None:
+            growth_mass = 1.0
+        elif self._growth_scaling==1:
+            growth_mass = np.minimum(1.0, np.exp((t-self._growth_endtime)/self._growth_timescale))
+        else:
+            growth_mass = np.minimum(1.0, np.power(np.maximum(1 + (1-self._growth_scaling) * (t-self._growth_endtime)/self._growth_timescale,0.0), 1/(1-self._growth_scaling)))
+        growth_torque = growth_mass**2 # Lin & Papaloizou 1979; Kanagawa et al. 2015
+        return growth_torque
 
-    def _f_no_ptbn(self, R):
+    def _f_no_ptbn(self, R, t=0):
         return np.ones_like(R)
         
-    def _f_Gaussian_ptbn(self, R):
-        return 1.+(self._ptbn_amplitude-1.)*np.exp(-0.5*np.power(R-self._ptbn_radius,2)/np.power(self._ptbn_width*self._f_H(self._ptbn_radius),2))
+    def _f_Gaussian_ptbn(self, R, t=0):
+        return 1. + (self._ptbn_amplitude-1.) * self._f_growth(t) * np.exp(-0.5*np.power(R-self._ptbn_radius,2)/np.power(self._ptbn_width*self._f_H(self._ptbn_radius),2))
 
     # Define auxiliary functions for Kanagawa prescription
-    def K_Kanagawa(self, R):
-        K_R = np.power((self._Mp*Mearth)/(self._Ms*Msun), 2) * np.power(self._H/R, -5) / self._f_alpha(R)
+    def K_Kanagawa(self, R,t):
+        K_R = np.power((self._Mp*Mearth)/(self._Ms*Msun), 2) * np.power(self._H/R, -5) / self._f_alpha(R) * self._f_growth(t) 
         return K_R[np.argmin(np.abs(R-self._Rp))]
-    def Kprime_Kanagawa(self, R):
-        K_R = np.power((self._Mp*Mearth)/(self._Ms*Msun), 2) * np.power(self._H/R, -3) / self._f_alpha(R)
+    def Kprime_Kanagawa(self, R,t):
+        K_R = np.power((self._Mp*Mearth)/(self._Ms*Msun), 2) * np.power(self._H/R, -3) / self._f_alpha(R) * self._f_growth(t) 
         return K_R[np.argmin(np.abs(R-self._Rp))]
-    def DR1_Kanagawa(self, R):
-        return (self.amplitude_Kanagawa(R)/4+0.08)*self.Kprime_Kanagawa(R)**0.25*self._Rp
-    def DR2_Kanagawa(self, R):
-        return 0.33*self.Kprime_Kanagawa(R)**0.25*self._Rp
-    def amplitude_Kanagawa(self, R):
+    def DR1_Kanagawa(self, R,t):
+        return (self.amplitude_Kanagawa(R,t)/4+0.08)*self.Kprime_Kanagawa(R,t)**0.25*self._Rp
+    def DR2_Kanagawa(self, R,t):
+        return 0.33*self.Kprime_Kanagawa(R,t)**0.25*self._Rp
+    def amplitude_Kanagawa(self, R,t):
         # This is for Sigma, so the viscosity profile needs 1/(this value)
-        return 1/(1+0.04*self.K_Kanagawa(R))
+        return 1/(1+0.04*self.K_Kanagawa(R,t))
 
-    def _f_Kanagawa_ptbn(self, R):
+    def _f_Kanagawa_ptbn(self, R, t=0):
         # Kanagawa et al. 2017 based on their 2015 and 2016 studies of depth and width respectively
         profile = np.ones_like(R)
-        profile[(np.abs(R-self._Rp)<self.DR2_Kanagawa(R))] = 1/(4.0*np.power(self.Kprime_Kanagawa(R),-1/4)*np.abs(R-self._Rp)/self._Rp-0.32)[(np.abs(R-self._Rp)<self.DR2_Kanagawa(R))]
-        profile[(np.abs(R-self._Rp)<self.DR1_Kanagawa(R))] = 1/self.amplitude_Kanagawa(R)
+        profile[(np.abs(R-self._Rp)<self.DR2_Kanagawa(R,t))] = 1/(4.0*np.power(self.Kprime_Kanagawa(R,t),-1/4)*np.abs(R-self._Rp)/self._Rp-0.32)[(np.abs(R-self._Rp)<self.DR2_Kanagawa(R,t))]
+        profile[(np.abs(R-self._Rp)<self.DR1_Kanagawa(R,t))] = 1/self.amplitude_Kanagawa(R,t)
         return profile
         
-    def _f_Duffell_ptbn(self, R):
+    def _f_Duffell_ptbn(self, R, t=0):
         # https://ui.adsabs.harvard.edu/abs/2020ApJ...889...16D/abstract
         raise NotImplementedError
 
@@ -118,8 +153,14 @@ class EOS_Table(object):
 
     def update(self, dt, Sigma, star=None, amax=None, G_0=None):
         """Update the eos"""
+        if star:
+            t = star.age
+        else:
+            t = 0
+        if dt>0:
+            self._nu_diff, self._nu_eff = self._f_nu(self._R, t=t)
         # Return Sigma divided by pertubation - only used in initial conditions
-        return Sigma/self._ptbn(self._R)
+        return Sigma/self._ptbn(self._R, t=t)
 
     def ASCII_header(self):
         """Print eos header"""
@@ -160,9 +201,9 @@ class LocallyIsothermalEOS(EOS_Table):
     def _f_H(self, R):
         return self._H0 * R**(1.5+self._q)
     
-    def _f_nu(self, R):
+    def _f_nu(self, R, t=0):
         # Returns diffusive and total effective viscosities
-        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R), self._f_alpha(R) * self._f_cs(R) * self._f_H(R) * self._ptbn(R)
+        return self._f_alpha(R) * self._f_cs(R) * self._f_H(R), self._f_alpha(R) * self._f_cs(R) * self._f_H(R) * self._ptbn(R, t=t)
 
     def _f_alpha(self, R):
         """Handle being passed a list of alphas
@@ -215,7 +256,7 @@ class TanhAlphaEOS(LocallyIsothermalEOS):
 
     def _f_nu(self, R, t=0):
         # Return Sigma divided by pertubation - only used in initial conditions
-        return self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R), self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R) * self._ptbn(R)
+        return self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R), self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R) * self._ptbn(R, t=t)
 
     def _f_alpha(self, R, t=0):
         if self._R_alpha:
@@ -231,11 +272,15 @@ class TanhAlphaEOS(LocallyIsothermalEOS):
 
     def update(self, dt, Sigma, star=None, amax=None, G_0=None):
         """Update the eos"""
+        if star:
+            t = star.age
+        else:
+            t = 0
         if dt>0 and self._t_trap>0:
-            self._alpha  = self._f_alpha(self._R, t = star.age)
-            self._nu_diff, self._nu_eff = self._f_nu(self._R, t = star.age)
+            self._alpha  = self._f_alpha(self._R, t=t)
+            self._nu_diff, self._nu_eff = self._f_nu(self._R, t=t)
         # Return Sigma divided by pertubation - only used in initial conditions
-        return Sigma/self._ptbn(self._R)
+        return Sigma/self._ptbn(self._R, t=t)
 
     def smooth_step(self, x, center=0, width=1):
         return 0.5 * (1 + np.tanh((x-center)/width))
@@ -277,6 +322,10 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
         return self._f_cs(R) / self._Mstar**0.5 * R**1.5
 
     def update(self, dt, Sigma, star=None, amax=None, G_0=None, T_ext=None):
+        if star:
+            t = star.age
+        else:
+            t = 0
         # Update G_0, f_FUV and M* if necessary
         if G_0 is not None:
             self._G_0   = G_0
@@ -285,9 +334,9 @@ class ExternalHeatEOS(LocallyIsothermalEOS):
         if star is not None:
             self._Mstar = star.M
         # Recalculate sound speed, scale height and viscosity profiles
-        self._set_arrays()
+        self._set_arrays(t=t)
         # Return Sigma divided by pertubation - only used in initial conditions
-        return Sigma/self._ptbn(self._R)
+        return Sigma/self._ptbn(self._R, t=t)
 
 _sqrt2pi = np.sqrt(2*np.pi)
 class IrradiatedEOS(EOS_Table):
@@ -410,17 +459,21 @@ class IrradiatedEOS(EOS_Table):
         H = cs / Om_k
         self._kappa_arr = self._kappa(Sigma / (sqrt2pi * H), self._T, amax)
         
-        self._set_arrays()
+        if star:
+            t = star.age
+        else:
+            t = 0
+        self._set_arrays(t=t)
 
         # Return Sigma divided by pertubation - only used in initial conditions
-        return Sigma/self._ptbn(self._R)
+        return Sigma/self._ptbn(self._R, t=t)
 
     def set_grid(self, grid):
         self._R = grid.Rc
         self._T = None
 
-    def _set_arrays(self):
-        super(IrradiatedEOS,self)._set_arrays()
+    def _set_arrays(self, t=0):
+        super(IrradiatedEOS,self)._set_arrays(t=t)
         self._Pr = self._f_Pr()
     
     def __H(self, R, T):

@@ -205,7 +205,7 @@ def setup_disc(model):
         Sigma = 1.0 / (grid.Rc**gamma_visc)          # R^-gamma Power Law
     if perturbation:
         if ptbn_kwargs["Initial"]:
-            Sigma = eos.update(0, Sigma)                            # Divide out perturbation profile is required
+            Sigma = eos.update(0, Sigma, star=star)       # Divide out perturbation profile if required
     else:
         eos.update(0, Sigma)
     Sigma *= p['mass'] / np.trapz(Sigma, np.pi*grid.Rc**2)          # Normalise to correct mass
