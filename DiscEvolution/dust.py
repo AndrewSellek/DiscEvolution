@@ -607,7 +607,7 @@ class SingleFluidDrift(object):
             except ValueError:
                 Sc = self._diffuse.Sc
             Sc = Sc * (0.5625/(1 + 4*St2) + 0.4375 + 0.25*St2)
-            if St_i:
+            if isinstance(St_i,np.ndarray):
                 Sc = Sc / disc._diffusive_boost
             depsdiff = self._diffuse(disc, eps_i, Sc)
             deps += depsdiff
