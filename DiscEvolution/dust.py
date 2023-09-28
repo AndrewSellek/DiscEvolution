@@ -10,6 +10,7 @@ import numpy as np
 from .constants import *
 from .disc import AccretionDisc
 from .reconstruction import DonorCell, VanLeer
+from scipy import interpolate
 
 class DustyDisc(AccretionDisc):
     """Dusty accretion disc. Base class for an accretion disc that also
@@ -315,6 +316,17 @@ class DustGrowthTwoPop(DustyDisc):
 
         return gamma
         
+    def _gamma_general(self, P):
+        """General dimensionless gradient"""
+        R = self.R
+        gamma = np.empty_like(P)
+        gamma[1:-1] = (P[2:] - P[:-2])/(R[2:] - R[:-2])
+        gamma[ 0]   = (P[ 1] - P[  0])/(R[ 1] - R[ 0])
+        gamma[-1]   = (P[-1] - P[ -2])/(R[-1] - R[-2])
+        gamma *= R/(P+1e-300)
+
+        return gamma
+        
     def _drift_limit(self, eps_tot):
         """Maximum size due to drift limit or drift driven fragmentation"""
         gamma = self._gammaP()
@@ -332,6 +344,15 @@ class DustGrowthTwoPop(DustyDisc):
         af = St_d * (2/np.pi) * (Sigma_G / self._rho_s)
 
         return ad, af
+        
+    def _diff_limit(self, eps_tot):
+        """Returns Stokes number at which dust in a trap becomes dominated by diffusion rather than growth"""
+        gamma = self._gammaP()
+        peak = np.argmin(np.abs(gamma))
+        gamma_prime = np.abs(np.gradient(gamma, np.log(self.R))[peak])
+        h = self.H / self.R
+        
+        return eps_tot / (gamma_prime * h**2+1e-300)
 
     def _t_grow(self, eps):
         return self._fgrow / (self.Omega_k * eps)
@@ -365,6 +386,48 @@ class DustGrowthTwoPop(DustyDisc):
         
         # Update the mass-fractions in each population
         fm   = self._fmass[1*(afrag < adrift)]
+        self._diffusive_boost = np.ones_like(self.R)           
+        if self._eos._ptbn!="None":
+            # Setup & default version
+            eps_gas = np.maximum(0.0,np.minimum(1.0,(1-eps_tot)))
+            gammaP = self._gamma_general(self.P)
+            gammae = self._gamma_general(self._eps[0]/eps_gas)
+            in_ptbn = (gammaP>0) #* (gammae>0)
+
+            if len(in_ptbn)>0:
+
+                # Smoothed versions
+                """
+                ## Spline smooth
+                for s in [1e-2]:
+                    smooth_param = len(self.R[in_ptbn])*s
+                    P_smooth = interpolate.splrep(np.log(self.R)[in_ptbn], np.log(self.P)[in_ptbn], s=smooth_param)
+                    eps_smooth = interpolate.splrep(np.log(self.R)[in_ptbn], np.log(self._eps[0]/eps_gas)[in_ptbn], s=smooth_param)
+                    gammaP_smooth = interpolate.splev(np.log(self.R)[in_ptbn], P_smooth, der=1)
+                    gammae_smooth = interpolate.splev(np.log(self.R)[in_ptbn], eps_smooth, der=1)
+                ## Polynomial smooth
+                for porder in [1,4]:
+                    quadratic_smooth = np.polyfit(self.R[in_ptbn], gammaP[in_ptbn], 2)
+                    quartic_smooth = np.polyfit(self.R[in_ptbn], gammae[in_ptbn], porder)
+                    gammaP_smooth = np.polyval(quadratic_smooth, self.R[in_ptbn])
+                    gammae_smooth = np.polyval(quartic_smooth, self.R[in_ptbn])
+                ## Average smooth
+                gammaP_av = (np.log(self.P)[in_ptbn][-1]-np.log(self.P)[in_ptbn][0])/(np.log(self.R)[in_ptbn][-1]-np.log(self.R)[in_ptbn][0])
+                gammae_av = (np.log(self._eps[0]/eps_gas)[in_ptbn][-1]-np.log(self._eps[0]/eps_gas)[in_ptbn][0])/(np.log(self.R)[in_ptbn][-1]-np.log(self.R)[in_ptbn][0])
+                """
+
+                self._diffusive_boost[in_ptbn] = np.power(np.maximum(1.0,1+2/3*gammae[in_ptbn])*2.75/gammaP[in_ptbn], 1.5-1.0*(afrag < adrift)[in_ptbn])
+                #self._diffusive_boost[in_ptbn] = np.power(np.maximum(1.0,1+2/3*gammae_smooth)*2.75/gammaP[in_ptbn],0.5)
+                #self._diffusive_boost[in_ptbn] = np.power(np.maximum(1.0,1+2/3*gammae_av)*2.75/gammaP_av,0.5)
+                self._diffusive_boost = np.minimum(self._diffusive_boost,1/(1.0-fm))
+
+		# Modify mass fractions
+                #fm[in_ptbn] = np.maximum(0.0,1.0-(1.0-self._fmass[1])*self._diffusive_boost[in_ptbn])
+                
+                # Diffusion size limit
+                #St_diff = (self.Stokes(size=afrag_t)>self._diff_limit(eps_tot))*in_ptbn
+                #fm[St_diff] = 0.0
+                
         self._fm[ids] = fm[ids]
         
         self._eps[0][ids] = ((1-fm)*eps_tot)[ids]
@@ -544,6 +607,7 @@ class SingleFluidDrift(object):
             except ValueError:
                 Sc = self._diffuse.Sc
             Sc = Sc * (0.5625/(1 + 4*St2) + 0.4375 + 0.25*St2)
+            Sc = Sc / disc._diffusive_boost
             depsdiff = self._diffuse(disc, eps_i, Sc)
             deps += depsdiff
 

@@ -80,7 +80,7 @@ class DiscEvolutionDriver(object):
             Dt_min = np.nanmin(Dt)
             dt = min(dt,Dt_min)
         
-	    # Determine tracers for dust step
+        # Determine tracers for dust step
         gas_chem, ice_chem = None, None
         dust = None
         try:
@@ -89,13 +89,13 @@ class DiscEvolutionDriver(object):
         except AttributeError:
             pass
 
-		# Do dust evolution        
+        # Do dust evolution        
         if self._dust:
             self._dust(dt, disc,
                        gas_tracers=gas_chem,
                        dust_tracers=ice_chem, v_visc=v_visc)
 
-		# Determine tracers for gas steps
+        # Determine tracers for gas steps
         try:
             gas_chem = disc.chem.gas.data
             ice_chem = disc.chem.ice.data
