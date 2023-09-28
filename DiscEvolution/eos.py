@@ -17,31 +17,19 @@ class EOS_Table(object):
         self._gamma = 1.0
         self._mu    = 2.4
         
-        # Set static ptbn
+        # Set perturbation properties
         if ptbn_kwargs["Type"]=='Gaussian':
             print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
             self._ptbn  = self._f_Gaussian_ptbn
             self._ptbn_amplitude = ptbn_kwargs['Amplitude']
             self._ptbn_radius = ptbn_kwargs['Radius']
             self._ptbn_width = ptbn_kwargs['Width']
-            try:
-                self._growth_scaling = ptbn_kwargs['Growth Scaling']    # 1/2 = 2D Bondi Pebble; 2/3 = 2D Hill Pebble/Oligarchic Planetestimal; 1 = 3D Pebble/Hill Gas; 4/3 = Runaway Planetesimal; 3 = Bondi Gas
-                self._growth_timescale = ptbn_kwargs['Growth Timescale']  
-                self._growth_endtime = ptbn_kwargs['Growth Endtime']  
-            except KeyError:
-                self._growth_scaling = None
         elif ptbn_kwargs["Type"]=='Kanagawa':
             print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
             self._ptbn  = self._f_Kanagawa_ptbn
             self._Mp = ptbn_kwargs['Planet Mass']   # Earth units
             self._Ms = ptbn_kwargs['Star Mass']     # Solar units
             self._Rp = ptbn_kwargs['Radius']
-            try:
-                self._growth_scaling = ptbn_kwargs['Growth Scaling']    # 1/2 = 2D Bondi Pebble; 2/3 = 2D Hill Pebble/Oligarchic Planetestimal; 1 = 3D Pebble/Hill Gas; 4/3 = Runaway Planetesimal; 3 = Bondi Gas
-                self._growth_timescale = ptbn_kwargs['Growth Timescale']  
-                self._growth_endtime = ptbn_kwargs['Growth Endtime']  
-            except KeyError:
-                self._growth_scaling = None
         elif ptbn_kwargs["Type"]=='Duffell':
             print("Initialising {} perturbation".format(ptbn_kwargs["Type"]))
             raise NotImplementedError
@@ -49,18 +37,27 @@ class EOS_Table(object):
             self._Mp = ptbn_kwargs['Planet Mass']   # Earth units
             self._Ms = ptbn_kwargs['Star Mass']     # Solar units
             self._Rp = ptbn_kwargs['Radius']
+        elif ptbn_kwargs["Type"]!='None':
+            print(ptbn_kwargs["Type"], "perturbation not recognised, default to None")
+            self._ptbn  = self._f_no_ptbn
+            self._enhance_diffusion = False
+        else:
+            print("Initialising with no perturbation")
+            self._ptbn  = self._f_no_ptbn
+            self._enhance_diffusion = False
+            
+        # Set perturbation growth
+        if self._ptbn!=self._f_no_ptbn:
             try:
                 self._growth_scaling = ptbn_kwargs['Growth Scaling']    # 1/2 = 2D Bondi Pebble; 2/3 = 2D Hill Pebble/Oligarchic Planetestimal; 1 = 3D Pebble/Hill Gas; 4/3 = Runaway Planetesimal; 3 = Bondi Gas
                 self._growth_timescale = ptbn_kwargs['Growth Timescale']  
                 self._growth_endtime = ptbn_kwargs['Growth Endtime']  
             except KeyError:
                 self._growth_scaling = None
-        elif ptbn_kwargs["Type"]!="None":
-            print(ptbn_kwargs["Type"], "perturbation not recognised, default to None")
-            self._ptbn  = self._f_no_ptbn
-        else:
-            print("Initialising with no perturbation")
-            self._ptbn  = self._f_no_ptbn
+            try:
+                self._enhance_diffusion = ptbn_kwargs['Enhance Diffusion']
+            except KeyError:
+                self._enhance_diffusion = False
     
     def set_grid(self, grid):
         self._R      = grid.Rc

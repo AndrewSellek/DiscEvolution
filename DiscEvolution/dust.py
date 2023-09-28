@@ -387,7 +387,7 @@ class DustGrowthTwoPop(DustyDisc):
         # Update the mass-fractions in each population
         fm   = self._fmass[1*(afrag < adrift)]
         self._diffusive_boost = np.ones_like(self.R)           
-        if self._eos._ptbn!="None":
+        if self._eos._ptbn!=self._eos._f_no_ptbn and self._eos._enhance_diffusion:
             # Setup & default version
             eps_gas = np.maximum(0.0,np.minimum(1.0,(1-eps_tot)))
             gammaP = self._gamma_general(self.P)
@@ -607,7 +607,8 @@ class SingleFluidDrift(object):
             except ValueError:
                 Sc = self._diffuse.Sc
             Sc = Sc * (0.5625/(1 + 4*St2) + 0.4375 + 0.25*St2)
-            Sc = Sc / disc._diffusive_boost
+            if St_i:
+                Sc = Sc / disc._diffusive_boost
             depsdiff = self._diffuse(disc, eps_i, Sc)
             deps += depsdiff
 
