@@ -211,9 +211,10 @@ def setup_disc(model):
     Sigma *= p['mass'] / np.trapz(Sigma, np.pi*grid.Rc**2)          # Normalise to correct mass
     if (p['unit']=='jup'):                                          # Disc mass given in Jupiter masses
         Sigma *= Mjup / AU**2
-    elif (p['unit']=='sol'):                                        # Disc mass given in Solar masses
+    elif (p['unit']=='sol') or (p['unit']=='sun'):                  # Disc mass given in Solar masses
         Sigma *= Msun / AU**2
-
+    else:
+        raise NotImplementedError
 
     try:
         feedback = model['disc']['feedback']
