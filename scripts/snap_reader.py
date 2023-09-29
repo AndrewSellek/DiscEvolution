@@ -65,10 +65,13 @@ class DiscSnap(object):
 
         # Only if chemistry used
         if chem_on:
-            if Nchem == 6:
+            if Nchem == 2:
+                self._chem = chem.MolecularIceAbund(chem.SimpleH2OMolAbund(Ndata),
+                                                    chem.SimpleH2OMolAbund(Ndata))
+            elif Nchem == 6:
                 self._chem = chem.MolecularIceAbund(chem.SimpleCOMolAbund(Ndata),
                                                     chem.SimpleCOMolAbund(Ndata))
-            if Nchem == 8:
+            elif Nchem == 8:
                 self._chem = chem.MolecularIceAbund(chem.SimpleCNOMolAbund(Ndata),
                                                     chem.SimpleCNOMolAbund(Ndata))
             else:
