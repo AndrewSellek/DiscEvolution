@@ -30,9 +30,9 @@ import DiscEvolution.FRIED.photorate as photorate
 
 from DiscEvolution.chemistry import (
     ChemicalAbund, MolecularIceAbund,
-    SimpleCNOAtomAbund, SimpleCNOMolAbund, SimpleH2OAtomAbund, SimpleH2OMolAbund,
-    SimpleCNOChemOberg, TimeDepCNOChemOberg,
-    EquilibriumCNOChemOberg,
+    SimpleCNOAtomAbund, SimpleCNOMolAbund, SimpleH2OAtomAbund, SimpleH2OMolAbund, SimpleCNOIsotopeAbund, SimpleCNOIsotopologueAbund,
+    SimpleCNOChemOberg, TimeDepCNOChemOberg, EquilibriumCNOChemOberg,
+    SimpleCNOChemObergI, EquilibriumCNOChemObergI,
     SimpleCNOChemMadhu, EquilibriumCNOChemMadhu,
     SimpleH2OChemKalyaan, EquilibriumH2OChemKalyaan,
 )
@@ -259,13 +259,18 @@ def setup_init_abund_simple(model, disc):
     if model['chemistry']['type']=="Kalyaan":
         X_atom = SimpleH2OAtomAbund(model['grid']['N'])
         X_atom.set_Kalyaan_abundances()
+    elif model['chemistry']['type']=="New":
+        X_atom = SimpleCNOIsotopeAbund(model['grid']['N'])
+        X_atom.set_protosolar_abundances(isotopes=False)    
+    elif model['chemistry']['type']=="Isotopes":
+        X_atom = SimpleCNOIsotopeAbund(model['grid']['N'])
+        X_atom.set_protosolar_abundances(isotopes=True)   
     else:
         X_atom = SimpleCNOAtomAbund(model['grid']['N'])
         X_atom.set_solar_abundances()    
 
     # Iterate as the ice fraction changes the dust-to-gas ratio
     for i in range(10):
-
         chem = chemistry.equilibrium_chem(disc.T,
                                           disc.midplane_gas_density,
                                           disc.dust_frac.sum(0),
@@ -310,6 +315,8 @@ def get_simple_chemistry_model(model):
         chemistry = EquilibriumCNOChemMadhu(fix_ratios=False, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'Oberg':
         chemistry = EquilibriumCNOChemOberg(fix_ratios=False, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+    elif chem_type == 'Isotopes' or chem_type == 'New':
+        chemistry = EquilibriumCNOChemObergI(fix_ratios=True,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'Kalyaan':
         chemistry = EquilibriumH2OChemKalyaan(fix_ratios=True,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'NoReact':

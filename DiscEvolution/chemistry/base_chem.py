@@ -197,6 +197,8 @@ class SimpleChemBase(object):
                           'NH3' : 68,
                           'C-grain'  : 500,
                           'Si-grain' : 1500,
+                          '13CO':  20,
+                          '13CO2': 70,
                           }
 
     def ASCII_header(self):
@@ -209,9 +211,10 @@ class SimpleChemBase(object):
         return self.__class__.__name__, { "fix_ratios" : self._fix_ratios }
 
     def equilibrium_chem(self, T, rho, dust_frac, f_small, R, SigmaG, abund):
-        """Compute the equilibrium chemistry"""
+        """Compute the equilibrium chemistry
+        Used only to calculate an initial condition"""
 
-        ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, abund)
+        ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, atomic_abund=abund)
         gas = ice.copy()
 
         for spec in ice.species:
@@ -225,6 +228,7 @@ class SimpleChemBase(object):
     def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, **kwargs):
 
         if not self._fix_ratios:
+            # Resetting to equilibrium ratios
             mol_abund  = chem.gas.copy()
             mol_abund += chem.ice
 
@@ -232,6 +236,7 @@ class SimpleChemBase(object):
                                                 mol_abund=mol_abund)
             chem.gas.data[:] = 0
         else:
+            # Advection only
             chem.ice += chem.gas
             chem.gas.data[:] = 0
 
@@ -289,6 +294,10 @@ class ThermalChem(object):
         # Dry CO and N2
         self._Tbind['CO'] = 850
         self._Tbind['N2'] = 770 # Fayolle+ (2016)
+                
+        # Assume isotopologues equal
+        self._Tbind['13CO'] = self._Tbind['CO']
+        self._Tbind['13CO2'] = self._Tbind['CO2']
 
         # Number of dust grains per nucleus, eta:
         m_g = 4*np.pi * rho_s * a**3 / 3
@@ -453,6 +462,10 @@ class nonThermalChem(object):
         # Dry CO and N2
         self._Tbind['CO'] = 850
         self._Tbind['N2'] = 770 # Fayolle+ (2016)
+        
+        # Assume isotopologues equal
+        self._Tbind['13CO'] = self._Tbind['CO']
+        self._Tbind['13CO2'] = self._Tbind['CO2']
 
         # Masses
         self._m_mol = {}

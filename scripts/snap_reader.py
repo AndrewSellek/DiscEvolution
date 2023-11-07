@@ -21,7 +21,7 @@ class DiscSnap(object):
         with open(filename) as f:
             for line in f:
                 if not vars:
-                    if not (line.startswith('# time') or line.startswith('# InternalEvaporation')):
+                    if not (line.startswith('# time') or line.startswith('# InternalEvaporation') or line.startswith('# EquilibriumCNOChemObergI')):
                         head += line
                     elif line.startswith('# InternalEvaporation'):
                         # Get internal photoevaporation type
@@ -30,7 +30,9 @@ class DiscSnap(object):
                     elif line.startswith('# time'):
                         vars = True
                         # Get the time
-                        self._t = float(line.strip().split(':')[1][:-2])                    
+                        self._t = float(line.strip().split(':')[1][:-2])    
+                    elif line.startswith('# EquilibriumCNOChemObergI'):
+                        pass
 
                     count += 1
                     continue
@@ -74,6 +76,10 @@ class DiscSnap(object):
             elif Nchem == 8:
                 self._chem = chem.MolecularIceAbund(chem.SimpleCNOMolAbund(Ndata),
                                                     chem.SimpleCNOMolAbund(Ndata))
+
+            elif Nchem == 9:
+                self._chem = chem.MolecularIceAbund(chem.SimpleCNOIsotopologueAbund(Ndata),
+                                                    chem.SimpleCNOIsotopologueAbund(Ndata))                                                    
             else:
                 raise AttributeError('Nchem = {}'.format(Nchem) + 
                                      '. Chemistry not recognized')

@@ -6,9 +6,11 @@ from .CO_chem import EquilibriumCOChemOberg
 from .CO_chem import SimpleCOChemMadhu, EquilibriumCOChemMadhu
 
 from .CNO_chem import SimpleCNOAtomAbund, SimpleCNOMolAbund
-from .CNO_chem import SimpleCNOChemOberg, TimeDepCNOChemOberg
-from .CNO_chem import EquilibriumCNOChemOberg
+from .CNO_chem import SimpleCNOChemOberg, TimeDepCNOChemOberg, EquilibriumCNOChemOberg
 from .CNO_chem import SimpleCNOChemMadhu, EquilibriumCNOChemMadhu
+
+from .new_chem import SimpleCNOIsotopeAbund, SimpleCNOIsotopologueAbund
+from .new_chem import SimpleCNOChemObergI, EquilibriumCNOChemObergI
 
 from .H2O_chem import SimpleH2OAtomAbund, SimpleH2OMolAbund
 from .H2O_chem import SimpleH2OChemKalyaan, EquilibriumH2OChemKalyaan
