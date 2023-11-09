@@ -49,6 +49,24 @@ class SimpleCNOIsotopeAbund(ChemicalAbund):
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
         self.update_isotopic_fractions()
         
+    def set_mass_abundances(self, muH=1.28):
+        """Mass abundance fractions of C, N, O, Si and S.
+
+        args:
+            muH : mean atomic mass, default = 1.28
+        """
+        m_abund = np.array([1., 2., 12., 13., 14., 16., 18., 28., 32.])
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+
+    def set_unit_abundances(self, muH=1.28):
+        """Unit abundance fractions of C, N, O and Si.
+
+        args:
+            muH : mean atomic mass, default = 1.28
+        """
+        m_abund = np.array([1., 1., 1., 1., 1., 1., 1., 1., 1.])
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+        
     def update_isotopic_fractions(self, fC13=None, fO18=None):
         ## Default values from Asplund 2021:
         # self._fC13 = 0.1107
