@@ -294,6 +294,19 @@ class ThermalChem(object):
         # Dry CO and N2
         self._Tbind['CO'] = 850
         self._Tbind['N2'] = 770 # Fayolle+ (2016)
+        
+        # Bosman et al. 2018 following Penteado et al. 2017
+        self._Tbind = {
+            'CO': 855., 'CO2': 2990., 'CH3OH': 4930.,
+            'CH4': 1090., 'C2H': 2137., 'C2H2': 2587., 'C2H6': 2300., 
+            'H2O': 5770., 'O2': 1000.,
+            'N2': 790., 'NH3': 3130.,
+            }
+            
+        # Druczkiewicz et al. 2021
+        self._Tbind['NH3'] = 3070
+        self._Tbind['NH4HCOO'] = 8290
+        self._Tbind['HCOOH'] = 4610
                 
         # Assume isotopologues equal
         self._Tbind['13CO'] = self._Tbind['CO']

@@ -94,11 +94,19 @@ class SimpleCNOIsotopologueAbund(ChemicalAbund):
         # Atomic make up of the molecules:
         self._n_spec = {'CO': {'C': 1, 'O': 1, }, '13CO': {'13C': 1, 'O': 1, },
                         'CO2': {'C': 1, 'O': 2, }, '13CO2': {'13C': 1, 'O': 2, },
-                        'H2O': {'O': 1, },
+                        'CH3OH': {'C': 1, 'O': 4, 'H': 4, },
+                        'CH4': {'C': 1, 'H': 4, },
+                        'C2H': {'C': 2, 'H': 1, },
+                        'C2H2': {'C': 2, 'H': 2, },
+                        'C2H6': {'C': 2, 'H': 2, },
+                        'H2O': {'O': 1, 'H': 2, },
+                        'O2': {'O': 2, },
                         'N2': {'N': 2, },
                         'NH3': {'N': 1, },
-                        'C-grain': {'C': 1-fC13, '13C': fC13},
-                        'Si-grain': {'O': 3, 'Si': 1},
+                        'HCOOH': {'C': 1, 'O': 2, 'H': 2, },
+                        'NH4HCOO': {'N': 1, 'C': 1, 'O': 2, 'H': 5,},
+                        'C-grain': {'C': 1-fC13, '13C': fC13, },
+                        'Si-grain': {'O': 3, 'Si': 1, },
                         }
 
     def atomic_abundance(self):
