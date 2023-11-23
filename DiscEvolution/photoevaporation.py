@@ -328,7 +328,7 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
             integ_mass = np.cumsum(dM_gas)/ Mjup
             calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( integ_mass[not_empty], disc.R[not_empty] ))
         norate = np.isnan(calc_rates)
-        calc_rates[norate] = 1e-10*(self._versionFRIED==1)
+        calc_rates[norate] = self.floor
         if not self._evolvedDust and self._versionFRIED==1:
             calc_rates[(calc_rates>1e-10)] = calc_rates[(calc_rates>1e-10)]/10
         return calc_rates
@@ -337,6 +337,10 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
         # Update maximum entrained size
         self._amax = Facchini_limit(disc,self._Mdot)
         return self._amax
+        
+    @property
+    def floor(self):
+        return self.FRIED_Rates._floor
 
 class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
     """External photoevaporation flow with a mass loss rate which is dependent on radius and surface density.

@@ -608,7 +608,7 @@ def run(model, io, base_name, all_in, restart, verbose=True, n_print=1000, end_l
                 not_empty = (model.disc.Sigma_G > 0)
                 Mdot_evap = model.photoevaporation_external.mass_loss_rate(model.disc,not_empty)
                 # Stopping condition
-                if (np.amax(Mdot_evap)<=1e-10):
+                if (np.amax(Mdot_evap)<=model.photoevaporation_external.floor):
                     print ("Photoevaporation rates below FRIED floor... terminating calculation at ~ {:.0f} yr".format(model.t/yr))
                     end = True
                 elif external_mass_loss_mode == 'Constant' and model.photoevaporation_external._empty:
