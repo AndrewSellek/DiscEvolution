@@ -112,12 +112,12 @@ class FRIED_2D(FRIEDInterpolator):
 
 		# At low surface densities and large enough radii, use scaling law M_dot \propto R \Sigma
 		low_Sigma = ( query_inputs[0] < Sigma_min(query_inputs[1]) )
-		ot_regime = low_Sigma * (calc_rates > floor)
+		ot_regime = low_Sigma * (calc_rates > self._floor)
 		scaling_factor = (query_inputs[0]/Sigma_min(query_inputs[1]))
 		calc_rates[ot_regime] *= scaling_factor[ot_regime]
 		
 		# At high surface densities, clip to top of grid
-		envelope_regime = ( query_inputs[0] > Sigma_max(query_inputs[1]) ) * (query_inputs[1] > R_min) * (query_inputs[1] < R_max)
+		envelope_regime = ( query_inputs[0] > Sigma_max(query_inputs[1]) ) * (query_inputs[1] > self._R_min) * (query_inputs[1] < self._R_max)
 
 		return ot_regime, envelope_regime, calc_rates
 
@@ -164,8 +164,8 @@ class FRIED_2DMS(FRIED_2DM):
 		new_query = np.array(query_inputs) # New array to hold modified query
 		# Clip densities to ones in grid for calculating rates
 		if extrapolate:
-			re_Sigma = np.minimum(query_inputs[0], Sigma_max(query_inputs[1],self._Mstar))
-			re_Sigma = np.maximum(re_Sigma, Sigma_min(query_inputs[1],self._Mstar))
+			re_Sigma = np.minimum(query_inputs[0], Sigma_max(query_inputs[1]))
+			re_Sigma = np.maximum(re_Sigma, Sigma_min(query_inputs[1]))
 		else:
 			re_Sigma = query_inputs[0]
 		# Convert sigma to a disc mass (for 1/R profile) and replace in query
@@ -187,8 +187,8 @@ class FRIED_2DM400S(FRIED_2DM400):
 		new_query = np.array(query_inputs) # New array to hold modified query
 		# Clip densities to ones in grid for calculating rates
 		if extrapolate:
-			re_Sigma = np.minimum(query_inputs[0], Sigma_max(query_inputs[1],self._Mstar))
-			re_Sigma = np.maximum(re_Sigma, Sigma_min(query_inputs[1],self._Mstar))
+			re_Sigma = np.minimum(query_inputs[0], Sigma_max(query_inputs[1]))
+			re_Sigma = np.maximum(re_Sigma, Sigma_min(query_inputs[1]))
 		else:
 			re_Sigma = query_inputs[0]
 		# Convert sigma to a disc mass at 400 AU (for 1/R profile) and replace in query
