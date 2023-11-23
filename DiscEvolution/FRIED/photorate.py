@@ -21,15 +21,15 @@ Import data from FRIED table (Haworth et al 2018)
 data_dir = os.path.join(os.path.dirname(__file__))
 
 # Take M_star, UV, M_disc, Sigma_disc, R_disc to build parameter space
-grid_parameters = np.loadtxt(os.path.join(data_dir, "friedgrid.dat"),
+grid_parameters = np.genfromtxt(os.path.join(data_dir, "friedgrid.dat"),
                              skiprows=1,usecols=(0,1,2,3,4))
 # Import M_dot
-grid_rate = np.loadtxt(os.path.join(data_dir, "friedgrid.dat"),skiprows=1,usecols=5)
+grid_rate = np.genfromtxt(os.path.join(data_dir, "friedgrid.dat"),skiprows=1,usecols=5)
 
 # Calculate mass within 400 AU and disc-to-star mass ratio and add to grid as columns 5/6
-M_400 = 2*np.pi*grid_parameters[:,3]*grid_parameters[:,4]*400*cst.AU**2/cst.Mjup
+M_400  = 2*np.pi*grid_parameters[:,3]*grid_parameters[:,4]*400*cst.AU**2/cst.Mjup
 M_frac = M_400*cst.Mjup/cst.Msun/grid_parameters[:,0]
-M_400 = np.reshape(M_400,(np.size(M_400),1))
+M_400  = np.reshape(M_400,(np.size(M_400),1))
 M_frac = np.reshape(M_frac,(np.size(M_frac),1))
 grid_parameters = np.hstack((grid_parameters,M_400))
 grid_parameters = np.hstack((grid_parameters,M_frac))
@@ -40,9 +40,9 @@ Parent class that returns the photoevaporation rate
 class FRIEDInterpolator(object):
     def __init__(self):
         # Fixed parameters of the grid
-        self._floor = 0
-        self._R_min = 5
-        self._R_max = 500
+        self._floor = 1e-10
+        self._R_min = 1
+        self._R_max = 400
         self._Mfrac_min = 3.2e-5
         self._Mfrac_max = 0.2
 
@@ -121,6 +121,9 @@ class FRIED_2D(FRIEDInterpolator):
 
 		return ot_regime, envelope_regime, calc_rates
 
+"""
+1st Order linear interpolators on different mass measures - either disc mass (M), surface density (S), extrapolated mass within 400 au (M400) or extrapolated fractional mass within 400 au (M400)
+"""
 class FRIED_2DS(FRIED_2D):
 	#Interpolates on surface density (S)
 	def __init__(self, grid_parameters, grid_rate, M_star, UV):
@@ -146,13 +149,15 @@ class FRIED_2DM400(FRIED_2D):
 		print("Extrapolation not valid when interpolating on mass")
 
 class FRIED_2DfM400(FRIED_2D):
-	# Interpolates on mass (M400)
+	# Interpolates on fractional mass (fM400)
 	def __init__(self, grid_parameters, grid_rate, M_star, UV):
 		super().__init__(grid_parameters, grid_rate, M_star, UV, [6,4])
 	#Extrapolation routine doesn't work here
 	def extrapolate(self,query_inputs,calc_rates):
 		print("Extrapolation not valid when interpolating on mass")
-
+"""
+2nd Order linear interpolators on different mass measures
+"""
 class FRIED_2DMS(FRIED_2DM):
 	# Interpolates on mass (M) but is provided with surface density (S)
 	def PE_rate(self, query_inputs,extrapolate=True):
@@ -236,6 +241,9 @@ class FRIED_2DM400M(FRIED_2DM400):
 	def extrapolate(self,query_inputs,calc_rates):
 		return self.extrapolate_master(query_inputs,calc_rates)
 
+"""
+Functions for testing
+"""
 def D2_space(interp_type = '400', extrapolate=True, UV=1000, M_star = 1.0, save=True, title=False, markers=False):
         # Function for plotting mass loss rates as function of R and Sigma
 

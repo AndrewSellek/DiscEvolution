@@ -8,7 +8,8 @@
 import numpy as np
 from .constants import AU, Msun, yr, Mjup
 from .dust import DustyDisc
-from .FRIED import photorate
+from .FRIED import photorate as photorate_v1
+from .FRIED import photorate_v2
 
 class ExternalPhotoevaporationBase(object):
     """Base class for handling the external photo-evaporation of discs
@@ -254,7 +255,7 @@ class FixedExternalEvaporation(ExternalPhotoevaporationBase):
         return self._amax * np.ones_like(disc.Sigma)
 
     def ASCII_header(self):
-        return ("# FixedExternalEvaportation, Mdot: {}, amax: {}"
+        return ("# FixedExternalEvaporation, Mdot: {}, amax: {}"
                 "".format(self._Mdot, self._amax))
 
     def HDF5_attributes(self):
@@ -274,30 +275,7 @@ class TimeExternalEvaporation(ExternalPhotoevaporationBase):
     """
 
     def __init__(self, time=1e6, amax=1e-3):
-        self._time = time
-        self._amax = amax
-
-        self._Mcum_gas  = 0.0
-        self._Mcum_dust = 0.0
-        self._Mcum_chem = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids}
-        self._wind_abun = {atom: 0.0 for atom in disc.chem.gas.atomic_abundance().atom_ids}
-
-    def mass_loss_rate(self, disc):
-        k = np.pi * AU**2 / Msun
-        return k * disc.R**2 * disc.Sigma / self._time
-
-    def max_size_entrained(self, disc):
-        return self._amax * np.ones_like(disc.Sigma)
-
-    def ASCII_header(self):
-        return ("# TimeExternalEvaportation, time: {}, amax: {}"
-                "".format(self._time, self._amax))
-
-    def HDF5_attributes(self):
-        header = {}
-        header['time'] = '{}'.format(self._time)
-        header['amax'] = '{}'.format(self._amax)
-        return self.__class__.__name__, header
+        raise Exception("Now considered deprecated, please do not use")
 
 ###### FRIED Variants
 class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
@@ -313,7 +291,8 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
         tshield : A delay to the onset of photoevaporation in yr (in development)
     """
 
-    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None, evolvedDust=True):
+    def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None, evolvedDust=True, versionFRIED=1):
+        self._versionFRIED = versionFRIED
         self._Mdot = 0.0
         self._tshield = tshield * yr
         self._amax = amax * np.zeros_like(disc.R)
@@ -365,7 +344,7 @@ class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = photorate.FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -383,7 +362,7 @@ class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = photorate.FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -401,7 +380,7 @@ class FRIEDExternalEvaporationfMS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = photorate.FRIED_2DfM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DfM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -419,7 +398,7 @@ class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = photorate.FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
         self._density = False
 
     def ASCII_header(self):

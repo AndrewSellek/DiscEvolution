@@ -107,12 +107,12 @@ class FRIEDv2_2D(FRIEDv2Interpolator):
 		return ot_regime, envelope_regime, calc_rates
 
 """
-Linear interpolators on different mass proxies - either disc mass (M), surface density (S) or extrapolated mass within 400 au (M400)
+1st Order linear interpolators on different mass measures - either disc mass (M), surface density (S), extrapolated mass within 400 au (M400) or extrapolated fractional mass within 400 au (M400)
 """
 class FRIEDv2_2DS(FRIEDv2_2D):
 	#Interpolates on surface density (S)
 	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [3,4])
+		super().__init__(grid_parameters, grid_rate, M_star, UV, [3,1])
 	#Extrapolation routine works here
 	def extrapolate(self,query_inputs,calc_rates):
 		return self.extrapolate_master(query_inputs,calc_rates)
@@ -120,7 +120,8 @@ class FRIEDv2_2DS(FRIEDv2_2D):
 class FRIEDv2_2DM(FRIEDv2_2D):
 	# Interpolates on mass (M)
 	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [2,4])
+	    raise NotImplementedError("Mass does not exist in the tabulation of the v2 grid")
+		super().__init__(grid_parameters, grid_rate, M_star, UV, [2,1])
 	#Extrapolation routine doesn't work here
 	def extrapolate(self,query_inputs,calc_rates):
 		print("Extrapolation not valid when interpolating on mass")
@@ -128,19 +129,21 @@ class FRIEDv2_2DM(FRIEDv2_2D):
 class FRIEDv2_2DM400(FRIEDv2_2D):
 	# Interpolates on mass (M400)
 	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [5,4])
+		super().__init__(grid_parameters, grid_rate, M_star, UV, [5,1])
 	#Extrapolation routine doesn't work here
 	def extrapolate(self,query_inputs,calc_rates):
 		print("Extrapolation not valid when interpolating on mass")
 
 class FRIEDv2_2DfM400(FRIEDv2_2D):
-	# Interpolates on mass (M400)
+	# Interpolates on fractional mass (fM400)
 	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [6,4])
+		super().__init__(grid_parameters, grid_rate, M_star, UV, [6,1])
 	#Extrapolation routine doesn't work here
 	def extrapolate(self,query_inputs,calc_rates):
 		print("Extrapolation not valid when interpolating on mass")
-
+"""
+2nd Order linear interpolators on different mass measures
+"""
 class FRIEDv2_2DMS(FRIEDv2_2DM):
 	# Interpolates on mass (M) but is provided with surface density (S)
 	def PE_rate(self, query_inputs,extrapolate=True):
