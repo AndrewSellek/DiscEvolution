@@ -211,10 +211,9 @@ def Facchini_limit(disc, Mdot):
     
     F = disc.H / np.sqrt(disc.H**2+disc.R**2)
     rho = disc._rho_s
-    Mstar = disc.star.M # In Msun
     v_th = np.sqrt(8/np.pi) * disc.cs
     
-    a_entr = (v_th * Mdot) / (Mstar * 4 * np.pi * F * rho)
+    a_entr = (v_th * Mdot) / (self._Mstar * 4 * np.pi * F * rho)
     a_entr *= Msun / AU**2 / yr
     return a_entr
 
@@ -288,15 +287,16 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
         Mdot : mass-loss rate in Msun / yr,  default = 10^-10
         amax : maximum grain size entrained, default = 0
         FUV  : The irradiating FUV field in Habing unit (G0), default = 0
-        tshield : A delay to the onset of photoevaporation in yr (in development)
+        tshield : A delay to the onset of photoevaporation in yr 
     """
 
     def __init__(self, disc, tshield=0, amax=0, Mcum_gas = 0.0, Mcum_dust = 0.0, Mcum_chem=None, evolvedDust=True, versionFRIED=1):
         self._versionFRIED = versionFRIED
+        self._Mstar = disc.star.M
+        self._FUV = disc.FUV
         self._Mdot = 0.0
         self._tshield = tshield * yr
         self._amax = amax * np.zeros_like(disc.R)
-        self._FUV = disc.FUV
         self._Rot = max(disc.R)
         self._evolvedDust = evolvedDust
 
@@ -328,8 +328,8 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
             integ_mass = np.cumsum(dM_gas)/ Mjup
             calc_rates[not_empty] = self.FRIED_Rates.PE_rate(( integ_mass[not_empty], disc.R[not_empty] ))
         norate = np.isnan(calc_rates)
-        calc_rates[norate] = 1e-10
-        if not self._evolvedDust:
+        calc_rates[norate] = 1e-10*(self._versionFRIED==1)
+        if not self._evolvedDust and self._versionFRIED==1:
             calc_rates[(calc_rates>1e-10)] = calc_rates[(calc_rates>1e-10)]/10
         return calc_rates
 
@@ -344,7 +344,7 @@ class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -362,7 +362,7 @@ class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -380,7 +380,8 @@ class FRIEDExternalEvaporationfMS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DfM400S(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        assert self._versionFRIED==1, "Only version 1 of FRIED supports fractional mass as version 2 requires use of multiple subgrids for this (not implemented)"
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DfM400S(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -398,7 +399,7 @@ class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,disc.star.M,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
         self._density = False
 
     def ASCII_header(self):

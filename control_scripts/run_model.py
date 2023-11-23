@@ -427,11 +427,14 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
     elif (p['photoevaporation'] == "FRIED" and disc.FUV>0):
         # Using 2DMS at 400 au
         photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc, tshield=tshield, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, evolvedDust = evolvedDust)
-    elif (p['photoevaporation'] == "FRIED" and disc.FUV<=0):
-        photoevap = None
+    elif (p['photoevaporation'] == "FRIEDv2" and disc.FUV>0):
+        # Using 2DMS at 400 au
+        photoevap = photoevaporation.FRIEDExternalEvaporationMS(disc, tshield=tshield, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust, evolvedDust = evolvedDust, versionFRIED=2)
     elif (p['photoevaporation'] == "Integrated"):
         # Using integrated M(<R), extrapolated to M400
         photoevap = photoevaporation.FRIEDExternalEvaporationM(disc, tshield=tshield, Mcum_gas = Mcum_gas, Mcum_dust = Mcum_dust)
+    elif (disc.FUV<=0):
+        photoevap = None
     elif (p['photoevaporation'] == "None"):
         photoevap = None
     else:
