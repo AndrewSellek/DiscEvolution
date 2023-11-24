@@ -16,20 +16,8 @@ class Formatter(object):
 """
 Import data from FRIED v2 table (Haworth et al 2023)
 """
-# Data listed as M_star, R_disc, Sigma_1AU, Sigma_disc, UV, M_dot
-# Values given in linear space apart from M_dot which is given as its base 10 logarithm
-data_dir = os.path.join(os.path.dirname(__file__)+'/FRIEDGRIDv2/')
-
-# Take M_star, R_disc, Sigma_1AU, Sigma_disc, UV to build parameter space
-grid_parameters = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=(0,1,2,3,4))#, names=('M_star','R_disc', 'Sigma_1AU', 'Sigma_disc', 'UV'))
-# Import M_dot
-grid_rate = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=5)
-
-# Calculate mass
-M_disc  = 2*np.pi*grid_parameters[:,3]*(grid_parameters[:,1]*cst.AU)**2/cst.Mjup
-grid_parameters = np.hstack((grid_parameters,M_disc))
-# Calculate mass within 400 AU and disc-to-star mass ratio and add to grid as columns 5/6
 """
+# Calculate mass within 400 AU and disc-to-star mass ratio and add to grid as columns 5/6
 M_400  = 2*np.pi*grid_parameters[:,2]*400*cst.AU**2/cst.Mjup
 M_frac = M_400*cst.Mjup/cst.Msun/grid_parameters[:,0]
 ,M_400  = np.reshape(M_400,(np.size(M_400),1))
@@ -41,7 +29,7 @@ grid_parameters = np.hstack((grid_parameters,M_frac))
 """
 Parent class that returns the photoevaporation rate
 """
-class FRIEDv2Interpolator(object):
+class FRIEDv2grid(object):
     def __init__(self, M_star, PAH=1.0, dust='growth'):
         # Fixed parameters/limits of the grid
         self._floor = 0
@@ -54,6 +42,20 @@ class FRIEDv2Interpolator(object):
         self._M_star = M_star
         self._PAH    = PAH
         self._dust   = dust
+        
+        # Load data from FRIED table (Haworth et al 2018)
+        ## Data listed as M_star, R_disc, Sigma_1AU, Sigma_disc, UV, M_dot
+        ## Values given in linear space apart from M_dot which is given as its base 10 logarithm
+        data_dir = os.path.join(os.path.dirname(__file__)+'/FRIEDGRIDv2/')
+        # Take M_star, R_disc, Sigma_1AU, Sigma_disc, UV to build parameter space
+        self.grid_parameters = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=(0,1,2,3,4))#, names=('M_star','R_disc', 'Sigma_1AU', 'Sigma_disc', 'UV'))
+        # Import M_dot
+        self.grid_rate = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=5)
+
+        # Calculate mass and add to grid as column 5
+        M_disc  = 2*np.pi*self.grid_parameters[:,3]*(self.grid_parameters[:,1]*cst.AU)**2/cst.Mjup
+        M_disc  = np.reshape(M_disc,(np.size(M_disc),1))
+        self.grid_parameters = np.hstack((self.grid_parameters,M_disc))
         
     def Sigma_min(self, R):
         return self._Sigma1AU_min/R
@@ -70,32 +72,32 @@ class FRIEDv2Interpolator(object):
         return M_dot                                        # Return exponentiated mass rate
 
 """
-Base 2D Class for interpolation
+Base class for 2D interpolation
 All interpolators are 2D (no UV for computational speed, also no stellar mass, PAH abundance or dust growth) in log space
 """
-class FRIEDv2_2D(FRIEDv2Interpolator):
-    def __init__(self, grid_parameters, grid_rate, M_star, UV, use_keys):
+class FRIEDv2_2DInterpolator(FRIEDv2grid):
+    def __init__(self, M_star, UV, use_keys):
         super().__init__(M_star)
 
         # Select correct UV subgrid and build the interpolator
         self._UV  = UV
-        select_UV = (np.abs(grid_parameters[:,4] - UV)<0.001)     # Filter based on ones with the correct UV
+        select_UV = (np.abs(self.grid_parameters[:,4] - UV)<0.001)     # Filter based on ones with the correct UV
 
         if sum(select_UV)==0:
             # Pre-interpolate UV
-            M_dot_interp_3D = interpolate.LinearNDInterpolator(np.log10(grid_parameters[:,(4,use_keys[0],use_keys[1])]), grid_rate)
-            select_unique = (np.abs(grid_parameters[:,4] - 1)<0.001)
+            M_dot_interp_3D = interpolate.LinearNDInterpolator(np.log10(self.grid_parameters[:,(4,use_keys[0],use_keys[1])]), self.grid_rate)
+            select_unique = (np.abs(self.grid_parameters[:,4] - 1)<0.001)
             # Now build the main interpolator            
-            grid_inputs_2D = grid_parameters[select_unique,:]   # Apply filter
+            grid_inputs_2D = self.grid_parameters[select_unique,:]   # Apply filter
             self.selected_inputs = grid_inputs_2D[:,(use_keys[0],use_keys[1])]    
             self.selected_rate = M_dot_interp_3D( tuple(( np.log10(np.full_like(self.selected_inputs[:,0],UV)), np.log10(self.selected_inputs[:,0]), np.log10(self.selected_inputs[:,1]) )) )
             self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs            
 
         else:
             # Usual case
-            grid_inputs_2D = grid_parameters[select_UV,:]       # Apply filter
+            grid_inputs_2D = self.grid_parameters[select_UV,:]       # Apply filter
             self.selected_inputs = grid_inputs_2D[:,(use_keys[0],use_keys[1])]
-            self.selected_rate = grid_rate[select_UV]
+            self.selected_rate = self.grid_rate[select_UV]
             self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs
 
         self.Sigma_inputs = grid_inputs_2D[:,(3,1)] # Select only the columns necessary - Sigma_disc, R_disc; just for plotting in tests
@@ -119,35 +121,35 @@ class FRIEDv2_2D(FRIEDv2Interpolator):
 """
 1st Order linear interpolators on different mass measures - either disc mass (M), surface density (S), or surface density at 1 AU (S1)
 """
-class FRIED_2DS(FRIEDv2_2D):
+class FRIED_2DS(FRIEDv2_2DInterpolator):
     #Interpolates on surface density (S)
-    def __init__(self, grid_parameters, grid_rate, M_star, UV):
-        super().__init__(grid_parameters, grid_rate, M_star, UV, [3,1])
+    def __init__(self, M_star, UV):
+        super().__init__(M_star, UV, [3,1])
     #Extrapolation routine works here
     def extrapolate(self,query_inputs,calc_rates):
         return self.extrapolate_master(query_inputs,calc_rates)
 
-class FRIED_2DM(FRIEDv2_2D):
+class FRIED_2DM(FRIEDv2_2DInterpolator):
     # Interpolates on mass (M)
-    def __init__(self, grid_parameters, grid_rate, M_star, UV):
-        super().__init__(grid_parameters, grid_rate, M_star, UV, [5,1])
+    def __init__(self, M_star, UV):
+        super().__init__(M_star, UV, [5,1])
     #Extrapolation routine doesn't work here
     def extrapolate(self,query_inputs,calc_rates):
         print("Extrapolation not valid when interpolating on mass")
 
-class FRIED_2DS1(FRIEDv2_2D):
+class FRIED_2DS1(FRIEDv2_2DInterpolator):
     # Interpolates on Sigma_1AU (S1)
-    def __init__(self, grid_parameters, grid_rate, M_star, UV):
-        super().__init__(grid_parameters, grid_rate, M_star, UV, [2,1])
+    def __init__(self, M_star, UV):
+        super().__init__(M_star, UV, [2,1])
     #Extrapolation routine doesn't work here
     def extrapolate(self,query_inputs,calc_rates):
         print("Extrapolation not valid when interpolating on mass")
 
-class FRIED_2DM400(FRIEDv2_2DS1):
+class FRIED_2DM400(FRIED_2DS1):
     # Interpolates on Sigma_1AU (S1); alias for for FRIED_2DS1 for backwards compatibility
-    def __init__(self, grid_parameters, grid_rate, M_star, UV):
+    def __init__(self, M_star, UV):
         raise Warning("M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
-        super().__init__(grid_parameters, grid_rate, M_star, UV)
+        super().__init__(M_star, UV)
         
 """
 2nd Order linear interpolators on different mass measures
@@ -214,15 +216,15 @@ class FRIED_2DS1M(FRIED_2DS1):
         
 class FRIED_2DM400S(FRIED_2DS1S):
     # Interpolates on Sigma_1AU (S1); alias for for FRIED_2DS1S for backwards compatibility
-    def __init__(self, grid_parameters, grid_rate, M_star, UV):
+    def __init__(self, M_star, UV):
         raise Warning("M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
-        super().__init__(grid_parameters, grid_rate, M_star, UV)
+        super().__init__(M_star, UV)
 
 class FRIED_2DM400M(FRIED_2DS1M):
     # Interpolates on Sigma_1AU (S1); alias for for FRIED_2DS1M for backwards compatibility
-    def __init__(self, grid_parameters, grid_rate, M_star, UV):
+    def __init__(self, M_star, UV):
         raise Warning("M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
-        super().__init__(grid_parameters, grid_rate, M_star, UV)
+        super().__init__(M_star, UV)
 
 """
 Functions for testing
@@ -232,11 +234,11 @@ def D2_space(interp_type = '400', extrapolate=True, UV=1000, M_star = 1.0, save=
 
         # Setup interpolator
         if (interp_type == 'MS'):
-            photorate = FRIED_2DMS(grid_parameters,grid_rate,M_star,UV)
+            photorate = FRIED_2DMS(M_star,UV)
         elif (interp_type == 'S'):
-            photorate = FRIED_2DS(grid_parameters,grid_rate,M_star,UV)
+            photorate = FRIED_2DS(M_star,UV)
         elif (interp_type == '400'):
-            photorate = FRIED_2DM400S(grid_parameters,grid_rate,M_star,UV)
+            photorate = FRIED_2DM400S(M_star,UV)
 
         # Setup interpolation grid
         R = np.linspace(1,400,1600,endpoint=True)

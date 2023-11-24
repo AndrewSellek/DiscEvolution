@@ -348,7 +348,7 @@ class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DS(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DS(self._Mstar,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -366,7 +366,7 @@ class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400S(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400S(self._Mstar,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -385,7 +385,7 @@ class FRIEDExternalEvaporationfMS(FRIEDExternalEvaporationBase):
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
         assert self._versionFRIED==1, "Only version 1 of FRIED supports fractional mass as version 2 requires use of multiple subgrids for this (not implemented)"
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DfM400S(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DfM400S(self._Mstar,self._FUV)
         self._density = True
 
     def ASCII_header(self):
@@ -403,7 +403,7 @@ class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
 
     def __init__(self, disc, **kwargs):
         super().__init__(disc, **kwargs)
-        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400M(photorate.grid_parameters,photorate.grid_rate,self._Mstar,self._FUV)
+        self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400M(self._Mstar,self._FUV)
         self._density = False
 
     def ASCII_header(self):

@@ -26,7 +26,6 @@ from DiscEvolution.disc_utils import mkdir_p
 from DiscEvolution.internal_photo import EUVDiscAlexander, XrayDiscOwen, XrayDiscPicogna
 from DiscEvolution.history import History
 import DiscEvolution.photoevaporation as photoevaporation
-import DiscEvolution.FRIED.photorate as photorate
 
 from DiscEvolution.chemistry import (
     ChemicalAbund, MolecularIceAbund,
