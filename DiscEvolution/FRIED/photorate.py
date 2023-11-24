@@ -238,12 +238,12 @@ class FRIED_2DM400M(FRIED_2DM400):
         return calc_rates
     #Extrapolation routine works here
     def extrapolate(self,query_inputs,calc_rates):
-        return self.extrapolate_master(query_inputs,calc_rates)
+        print("Extrapolation not valid when interpolating on mass")
 
 """
 Functions for testing
 """
-def D2_space(interp_type = 'M400S', extrapolate=True, UV=1000, M_star = 1.0, title=False, markers=False, ax=None, disc=None):
+def D2_space(interp_type = 'M400S', extrapolate=True, UV=1000, M_star = 1.0, title=False, markers=False, ax=None, discs=[None]):
         # Function for plotting mass loss rates as function of R and Sigma
 
         # Setup interpolator
@@ -260,7 +260,7 @@ def D2_space(interp_type = 'M400S', extrapolate=True, UV=1000, M_star = 1.0, tit
         (R_interp, Sigma_interp) = np.meshgrid(R,Sigma)
 
         # Interpolate
-        rates = photorate.PE_rate((Sigma_interp,R_interp))
+        rates = photorate.PE_rate((Sigma_interp,R_interp), extrapolate=extrapolate)
 
         # Plot
         n_levels = 25#*(2-save) 
@@ -276,11 +276,23 @@ def D2_space(interp_type = 'M400S', extrapolate=True, UV=1000, M_star = 1.0, tit
             ax.plot(grid_inputs_2D[:,1],grid_inputs_2D[:,0],marker='x',color='black',linestyle='None')
             
         # Superpose a disc profile
-        if not disc is None:
-            p, = ax.plot(disc[0], disc[1], color='white', linestyle='--')
-            discrates = photorate.PE_rate((disc[1],disc[0]))
-            locmax = np.nanargmax(discrates)
-            ax.plot(disc[0][locmax], disc[1][locmax], color=p.get_color(), linestyle='', marker='+')
+        if not discs[0] is None:
+            if len(discs)>3:
+                Rmax = []
+                Smax = []
+                for disc in discs:
+                    discrates = photorate.PE_rate((disc[1],disc[0]), extrapolate=extrapolate)
+                    locmax = np.nanargmax(discrates)
+                    Rmax.append(disc[0][locmax])
+                    Smax.append(disc[1][locmax])
+                ax.plot(Rmax, Smax, color='white', linestyle='-.')
+            else:
+                for disc in discs:
+                    p, = ax.plot(disc[0], disc[1], color='white', linestyle='--')
+                    discrates = photorate.PE_rate((disc[1],disc[0]), extrapolate=extrapolate)
+                    locmax = np.nanargmax(discrates)
+                    ax.plot(disc[0][locmax], disc[1][locmax], color=p.get_color(), linestyle='', marker='+')
+
 
         # Adorn plot
         ax.set_xscale('log')
