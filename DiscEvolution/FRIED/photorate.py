@@ -21,10 +21,9 @@ Import data from FRIED table (Haworth et al 2018)
 data_dir = os.path.join(os.path.dirname(__file__))
 
 # Take M_star, UV, M_disc, Sigma_disc, R_disc to build parameter space
-grid_parameters = np.genfromtxt(os.path.join(data_dir, "friedgrid.dat"),
-                             skiprows=1,usecols=(0,1,2,3,4))
+grid_parameters = np.genfromtxt(os.path.join(data_dir, "friedgrid.dat"),skip_header=1,usecols=(0,1,2,3,4))
 # Import M_dot
-grid_rate = np.genfromtxt(os.path.join(data_dir, "friedgrid.dat"),skiprows=1,usecols=5)
+grid_rate = np.genfromtxt(os.path.join(data_dir, "friedgrid.dat"),skip_header=1,usecols=5)
 
 # Calculate mass within 400 AU and disc-to-star mass ratio and add to grid as columns 5/6
 M_400  = 2*np.pi*grid_parameters[:,3]*grid_parameters[:,4]*400*cst.AU**2/cst.Mjup
@@ -46,200 +45,200 @@ class FRIEDInterpolator(object):
         self._Mfrac_min = 3.2e-5
         self._Mfrac_max = 0.2
 
-    def Sigma_min(R):
-    	return self._Mfrac_min * self._Mstar*cst.Msun / (2*np.pi*R*400*cst.AU**2)
+    def Sigma_min(self, R):
+        return self._Mfrac_min * self._Mstar*cst.Msun / (2*np.pi*R*400*cst.AU**2)
         
-    def Sigma_max(R):
-    	return self._Mfrac_max * self._Mstar*cst.Msun / (2*np.pi*R*400*cst.AU**2)
+    def Sigma_max(self, R):
+        return self._Mfrac_max * self._Mstar*cst.Msun / (2*np.pi*R*400*cst.AU**2)
 
-	def PE_rate(self, query_inputs, extrapolate=False):
-		query_log = tuple(np.log10(query_inputs))           # Take logarithm of input values
-		M_dot = self.M_dot_interp(query_log)                # Perform the interpolation
-		M_dot = np.power(10,M_dot)                          # Exponentiate
-		M_dot[(query_inputs[1]<self._R_min)] = self._floor  # Fix values inside 1 AU (outside FRIED) to FRIED floor
+    def PE_rate(self, query_inputs, extrapolate=False):
+        query_log = tuple(np.log10(query_inputs))           # Take logarithm of input values
+        M_dot = self.M_dot_interp(query_log)                # Perform the interpolation
+        M_dot = np.power(10,M_dot)                          # Exponentiate
+        M_dot[(query_inputs[1]<self._R_min)] = self._floor  # Fix values inside 1 AU (outside FRIED) to FRIED floor
         #M_dot[(query_inputs[1]>self._R_min)] = self._floor  # Fix values outside 400 AU (outside FRIED) to FRIED floor   ## Can probably do better extrapolating off of R=400 value using M_dot~R*Sigma
-		return M_dot                                        # Return exponentiated mass rate
+        return M_dot                                        # Return exponentiated mass rate
 
 """
 Base 2D Class for interpolation
 All interpolators are 2D (no stellar mass or UV for computational speed) in log space
 """
 class FRIED_2D(FRIEDInterpolator):
-	def __init__(self, grid_parameters, grid_rate, M_star, UV, use_keys):
-	    super().__init__(self)
-	
-	    # Select correct subgrid and build the interpolator
-		self._Mstar = M_star
-		self._UV    = UV
-		select_mass = (np.abs(grid_parameters[:,0] - M_star)<0.001) # Filter based on ones with the correct mass
-		select_UV   = (np.abs(grid_parameters[:,1] - UV)<0.001)     # Filter based on ones with the correct UV
-		select_MUV  = select_mass * select_UV
-		
-		if sum(select_mass)==0 and sum(select_UV)==0:
-			raise NotImplementedError("This stellar mass and FUV field are not in the FRIED grid... currently not set up to interpolate between in 4D")
-		
-		elif sum(select_mass)==0:
-    	    # Pre-interpolate mass
+    def __init__(self, grid_parameters, grid_rate, M_star, UV, use_keys):
+        super().__init__()
+        
+        # Select correct subgrid and build the interpolator
+        self._Mstar = M_star
+        self._UV    = UV
+        select_mass = (np.abs(grid_parameters[:,0] - M_star)<0.001) # Filter based on ones with the correct mass
+        select_UV   = (np.abs(grid_parameters[:,1] - UV)<0.001)     # Filter based on ones with the correct UV
+        select_MUV  = select_mass * select_UV
+
+        if sum(select_mass)==0 and sum(select_UV)==0:
+            raise NotImplementedError("This stellar mass and FUV field are not in the FRIED grid... currently not set up to interpolate between in 4D")
+        
+        elif sum(select_mass)==0:
+            # Pre-interpolate mass
             if 6 not in use_keys:
-	    		raise NotImplementedError("This stellar mass ({}) is not in the FRIED grid... currently not set up to interpolate between unless using fractional mass".format(M_star))
-			grid_inputs_3D = grid_parameters[select_UV,:]	# Apply filter
-			values_3D = grid_rate[select_UV]
-			M_dot_interp_3D = interpolate.LinearNDInterpolator(grid_inputs_3D[:,(0,use_keys[0],use_keys[1])], values_3D)
-			self.selected_inputs = grid_inputs_3D[:,(use_keys[0],use_keys[1])]
-			self.selected_rate = M_dot_interp_3D(tuple((np.full_like(self.selected_inputs[:,0],M_star),self.selected_inputs[:,0],self.selected_inputs[:,1])))
-			self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs
+                raise NotImplementedError("This stellar mass ({}) is not in the FRIED grid... currently not set up to interpolate between unless using fractional mass".format(M_star))
+            grid_inputs_3D = grid_parameters[select_UV,:]    # Apply filter
+            values_3D = grid_rate[select_UV]
+            M_dot_interp_3D = interpolate.LinearNDInterpolator(grid_inputs_3D[:,(0,use_keys[0],use_keys[1])], values_3D)
+            self.selected_inputs = grid_inputs_3D[:,(use_keys[0],use_keys[1])]
+            self.selected_rate = M_dot_interp_3D(tuple((np.full_like(self.selected_inputs[:,0],M_star),self.selected_inputs[:,0],self.selected_inputs[:,1])))
+            self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs
 
-		elif sum(select_UV)==0:
+        elif sum(select_UV)==0:
             # Pre-interpolate UV
-			grid_inputs_3D = grid_parameters[select_mass,:]	# Apply filter
-			values_3D = grid_rate[select_mass]
-			M_dot_interp_3D = interpolate.LinearNDInterpolator(np.log10(grid_inputs_3D[:,(1,use_keys[0],use_keys[1])]), values_3D)
-			self.selected_inputs = grid_inputs_3D[:,(use_keys[0],use_keys[1])]
-			self.selected_rate = M_dot_interp_3D(tuple((np.log10(np.full_like(self.selected_inputs[:,0],UV)),np.log10(self.selected_inputs[:,0]),np.log10(self.selected_inputs[:,1]))))
-			self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs			
+            grid_inputs_3D = grid_parameters[select_mass,:]    # Apply filter
+            values_3D = grid_rate[select_mass]
+            M_dot_interp_3D = interpolate.LinearNDInterpolator(np.log10(grid_inputs_3D[:,(1,use_keys[0],use_keys[1])]), values_3D)
+            self.selected_inputs = grid_inputs_3D[:,(use_keys[0],use_keys[1])]
+            self.selected_rate = M_dot_interp_3D(tuple((np.log10(np.full_like(self.selected_inputs[:,0],UV)),np.log10(self.selected_inputs[:,0]),np.log10(self.selected_inputs[:,1]))))
+            self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs            
 
-		else:
-		    # Usual case
-			grid_inputs_2D = grid_parameters[select_MUV,:] # Apply filter
-			self.selected_inputs = grid_inputs_2D[:,(use_keys[0],use_keys[1])]
-			self.selected_rate = grid_rate[select_MUV]
-			self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs
-			self.Sigma_inputs = grid_inputs_2D[:,(3,4)] # Select only the columns necessary - Sigma_disc, R_disc; just for plotting in tests
+        else:
+            # Usual case
+            grid_inputs_2D = grid_parameters[select_MUV,:] # Apply filter
+            self.selected_inputs = grid_inputs_2D[:,(use_keys[0],use_keys[1])]
+            self.selected_rate = grid_rate[select_MUV]
+            self.M_dot_interp = interpolate.LinearNDInterpolator(np.log10(self.selected_inputs),self.selected_rate) # Build interpolator on log of inputs
+            self.Sigma_inputs = grid_inputs_2D[:,(3,4)] # Select only the columns necessary - Sigma_disc, R_disc; just for plotting in tests
 
-	def extrapolate_master(self, query_inputs, calc_rates):
+    def extrapolate_master(self, query_inputs, calc_rates):
         # The instances call PE_rate with the maximum of Sigma, Sigma_min, the extrapolation uses the true sigma to rescale
         # The instances call PE_rate with the minimum of Sigma, Sigma_max, no further calculations needed
 
-		# At low surface densities and large enough radii, use scaling law M_dot \propto R \Sigma
-		low_Sigma = ( query_inputs[0] < Sigma_min(query_inputs[1]) )
-		ot_regime = low_Sigma * (calc_rates > self._floor)
-		scaling_factor = (query_inputs[0]/Sigma_min(query_inputs[1]))
-		calc_rates[ot_regime] *= scaling_factor[ot_regime]
-		
-		# At high surface densities, clip to top of grid
-		envelope_regime = ( query_inputs[0] > Sigma_max(query_inputs[1]) ) * (query_inputs[1] > self._R_min) * (query_inputs[1] < self._R_max)
+        # At low surface densities and large enough radii, use scaling law M_dot \propto R \Sigma
+        low_Sigma = ( query_inputs[0] < self.Sigma_min(query_inputs[1]) )
+        ot_regime = low_Sigma * (calc_rates > self._floor)
+        scaling_factor = (query_inputs[0]/self.Sigma_min(query_inputs[1]))
+        calc_rates[ot_regime] *= scaling_factor[ot_regime]
+        
+        # At high surface densities, clip to top of grid
+        envelope_regime = ( query_inputs[0] > self.Sigma_max(query_inputs[1]) ) * (query_inputs[1] > self._R_min) * (query_inputs[1] < self._R_max)
 
-		return ot_regime, envelope_regime, calc_rates
+        return ot_regime, envelope_regime, calc_rates
 
 """
 1st Order linear interpolators on different mass measures - either disc mass (M), surface density (S), extrapolated mass within 400 au (M400) or extrapolated fractional mass within 400 au (M400)
 """
 class FRIED_2DS(FRIED_2D):
-	#Interpolates on surface density (S)
-	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [3,4])
-	#Extrapolation routine works here
-	def extrapolate(self,query_inputs,calc_rates):
-		return self.extrapolate_master(query_inputs,calc_rates)
+    #Interpolates on surface density (S)
+    def __init__(self, grid_parameters, grid_rate, M_star, UV):
+        super().__init__(grid_parameters, grid_rate, M_star, UV, [3,4])
+    #Extrapolation routine works here
+    def extrapolate(self,query_inputs,calc_rates):
+        return self.extrapolate_master(query_inputs,calc_rates)
 
 class FRIED_2DM(FRIED_2D):
-	# Interpolates on mass (M)
-	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [2,4])
-	#Extrapolation routine doesn't work here
-	def extrapolate(self,query_inputs,calc_rates):
-		print("Extrapolation not valid when interpolating on mass")
+    # Interpolates on mass (M)
+    def __init__(self, grid_parameters, grid_rate, M_star, UV):
+        super().__init__(grid_parameters, grid_rate, M_star, UV, [2,4])
+    #Extrapolation routine doesn't work here
+    def extrapolate(self,query_inputs,calc_rates):
+        print("Extrapolation not valid when interpolating on mass")
 
 class FRIED_2DM400(FRIED_2D):
-	# Interpolates on mass (M400)
-	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [5,4])
-	#Extrapolation routine doesn't work here
-	def extrapolate(self,query_inputs,calc_rates):
-		print("Extrapolation not valid when interpolating on mass")
+    # Interpolates on mass (M400)
+    def __init__(self, grid_parameters, grid_rate, M_star, UV):
+        super().__init__(grid_parameters, grid_rate, M_star, UV, [5,4])
+    #Extrapolation routine doesn't work here
+    def extrapolate(self,query_inputs,calc_rates):
+        print("Extrapolation not valid when interpolating on mass")
 
 class FRIED_2DfM400(FRIED_2D):
-	# Interpolates on fractional mass (fM400)
-	def __init__(self, grid_parameters, grid_rate, M_star, UV):
-		super().__init__(grid_parameters, grid_rate, M_star, UV, [6,4])
-	#Extrapolation routine doesn't work here
-	def extrapolate(self,query_inputs,calc_rates):
-		print("Extrapolation not valid when interpolating on mass")
+    # Interpolates on fractional mass (fM400)
+    def __init__(self, grid_parameters, grid_rate, M_star, UV):
+        super().__init__(grid_parameters, grid_rate, M_star, UV, [6,4])
+    #Extrapolation routine doesn't work here
+    def extrapolate(self,query_inputs,calc_rates):
+        print("Extrapolation not valid when interpolating on mass")
 """
 2nd Order linear interpolators on different mass measures
 """
 class FRIED_2DMS(FRIED_2DM):
-	# Interpolates on mass (M) but is provided with surface density (S)
-	def PE_rate(self, query_inputs,extrapolate=True):
-		new_query = np.array(query_inputs) # New array to hold modified query
-		# Clip densities to ones in grid for calculating rates
-		if extrapolate:
-			re_Sigma = np.minimum(query_inputs[0], Sigma_max(query_inputs[1]))
-			re_Sigma = np.maximum(re_Sigma, Sigma_min(query_inputs[1]))
-		else:
-			re_Sigma = query_inputs[0]
-		# Convert sigma to a disc mass (for 1/R profile) and replace in query
-		Mass_calc = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU)**2 / (cst.Mjup)
-		new_query[0] = Mass_calc
-		# Calculate rates
-		calc_rates = super().PE_rate(new_query)
-		# Adjust calculated rates according to extrapolation prescription using actual density
-		if extrapolate:
-			_, _, calc_rates = self.extrapolate(query_inputs,calc_rates)
-		return calc_rates
-	#Extrapolation routine works here
-	def extrapolate(self,query_inputs,calc_rates):
-		return self.extrapolate_master(query_inputs,calc_rates)
+    # Interpolates on mass (M) but is provided with surface density (S)
+    def PE_rate(self, query_inputs,extrapolate=True):
+        new_query = np.array(query_inputs) # New array to hold modified query
+        # Clip densities to ones in grid for calculating rates
+        if extrapolate:
+            re_Sigma = np.minimum(query_inputs[0], self.Sigma_max(query_inputs[1]))
+            re_Sigma = np.maximum(re_Sigma, self.Sigma_min(query_inputs[1]))
+        else:
+            re_Sigma = query_inputs[0]
+        # Convert sigma to a disc mass (for 1/R profile) and replace in query
+        Mass_calc = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU)**2 / (cst.Mjup)
+        new_query[0] = Mass_calc
+        # Calculate rates
+        calc_rates = super().PE_rate(new_query)
+        # Adjust calculated rates according to extrapolation prescription using actual density
+        if extrapolate:
+            _, _, calc_rates = self.extrapolate(query_inputs,calc_rates)
+        return calc_rates
+    #Extrapolation routine works here
+    def extrapolate(self,query_inputs,calc_rates):
+        return self.extrapolate_master(query_inputs,calc_rates)
 
 class FRIED_2DM400S(FRIED_2DM400):
-	# Interpolates on mass at 400 AU (M400) but is provided with surface density (S)
-	def PE_rate(self, query_inputs,extrapolate=True):
-		new_query = np.array(query_inputs) # New array to hold modified query
-		# Clip densities to ones in grid for calculating rates
-		if extrapolate:
-			re_Sigma = np.minimum(query_inputs[0], Sigma_max(query_inputs[1]))
-			re_Sigma = np.maximum(re_Sigma, Sigma_min(query_inputs[1]))
-		else:
-			re_Sigma = query_inputs[0]
-		# Convert sigma to a disc mass at 400 AU (for 1/R profile) and replace in query
-		Mass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Mjup)
-		new_query[0] = Mass_400 # Replace first query parameter with mass
-		# Calculate rates
-		calc_rates =  super().PE_rate(new_query)
-		# Adjust calculated rates according to extrapolation prescription using actual density
-		if extrapolate:
-			_, _, calc_rates = self.extrapolate(query_inputs,calc_rates)
-		return calc_rates
-	#Extrapolation routine works here
-	def extrapolate(self,query_inputs,calc_rates):
-		return self.extrapolate_master(query_inputs,calc_rates)
+    # Interpolates on mass at 400 AU (M400) but is provided with surface density (S)
+    def PE_rate(self, query_inputs,extrapolate=True):
+        new_query = np.array(query_inputs) # New array to hold modified query
+        # Clip densities to ones in grid for calculating rates
+        if extrapolate:
+            re_Sigma = np.minimum(query_inputs[0], self.Sigma_max(query_inputs[1]))
+            re_Sigma = np.maximum(re_Sigma, self.Sigma_min(query_inputs[1]))
+        else:
+            re_Sigma = query_inputs[0]
+        # Convert sigma to a disc mass at 400 AU (for 1/R profile) and replace in query
+        Mass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Mjup)
+        new_query[0] = Mass_400 # Replace first query parameter with mass
+        # Calculate rates
+        calc_rates =  super().PE_rate(new_query)
+        # Adjust calculated rates according to extrapolation prescription using actual density
+        if extrapolate:
+            _, _, calc_rates = self.extrapolate(query_inputs,calc_rates)
+        return calc_rates
+    #Extrapolation routine works here
+    def extrapolate(self,query_inputs,calc_rates):
+        return self.extrapolate_master(query_inputs,calc_rates)
 
 class FRIED_2DfM400S(FRIED_2DfM400):
-	# Interpolates on fractional mass at 400 AU (fM400) but is provided with surface density (S)
-	def PE_rate(self, query_inputs,extrapolate=True):
-		new_query = np.array(query_inputs) # New array to hold modified query
-		# Clip densities to ones in grid for calculating rates
-		if extrapolate:
-			re_Sigma = np.minimum(query_inputs[0], Sigma_max(query_inputs[1],self._Mstar))
-			re_Sigma = np.maximum(re_Sigma, Sigma_min(query_inputs[1],self._Mstar))
-		else:
-			re_Sigma = query_inputs[0]
-		# Convert sigma to a disc mass at 400 AU (for 1/R profile) and replace in query
-		fMass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Msun * self._Mstar)
-		new_query[0] = fMass_400 # Replace first query parameter with mass
-		# Calculate rates
-		calc_rates =  super().PE_rate(new_query)
-		# Adjust calculated rates according to extrapolation prescription using actual density
-		if extrapolate:
-			_, _, calc_rates = self.extrapolate(query_inputs,calc_rates)
-		return calc_rates
-	#Extrapolation routine works here
-	def extrapolate(self,query_inputs,calc_rates):
-		return self.extrapolate_master(query_inputs,calc_rates)
+    # Interpolates on fractional mass at 400 AU (fM400) but is provided with surface density (S)
+    def PE_rate(self, query_inputs,extrapolate=True):
+        new_query = np.array(query_inputs) # New array to hold modified query
+        # Clip densities to ones in grid for calculating rates
+        if extrapolate:
+            re_Sigma = np.minimum(query_inputs[0], self.Sigma_max(query_inputs[1],self._Mstar))
+            re_Sigma = np.maximum(re_Sigma, self.Sigma_min(query_inputs[1],self._Mstar))
+        else:
+            re_Sigma = query_inputs[0]
+        # Convert sigma to a disc mass at 400 AU (for 1/R profile) and replace in query
+        fMass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Msun * self._Mstar)
+        new_query[0] = fMass_400 # Replace first query parameter with mass
+        # Calculate rates
+        calc_rates =  super().PE_rate(new_query)
+        # Adjust calculated rates according to extrapolation prescription using actual density
+        if extrapolate:
+            _, _, calc_rates = self.extrapolate(query_inputs,calc_rates)
+        return calc_rates
+    #Extrapolation routine works here
+    def extrapolate(self,query_inputs,calc_rates):
+        return self.extrapolate_master(query_inputs,calc_rates)
 
 class FRIED_2DM400M(FRIED_2DM400):
-	# Interpolates on mass at 400 AU (M400) but is provided with mass (M)
-	def PE_rate(self, query_inputs,extrapolate=False):
-		new_query = np.array(query_inputs) # New array to hold modified query
-		# Convert to a disc mass at 400 AU (for 1/R profile) and replace in query
-		Mass_400 = query_inputs[0] * (400 / query_inputs[1])
-		new_query[0] = Mass_400 # Replace first query parameter with mass
-		# Calculate rates
-		calc_rates =  super().PE_rate(new_query)
-		return calc_rates
-	#Extrapolation routine works here
-	def extrapolate(self,query_inputs,calc_rates):
-		return self.extrapolate_master(query_inputs,calc_rates)
+    # Interpolates on mass at 400 AU (M400) but is provided with mass (M)
+    def PE_rate(self, query_inputs,extrapolate=False):
+        new_query = np.array(query_inputs) # New array to hold modified query
+        # Convert to a disc mass at 400 AU (for 1/R profile) and replace in query
+        Mass_400 = query_inputs[0] * (400 / query_inputs[1])
+        new_query[0] = Mass_400 # Replace first query parameter with mass
+        # Calculate rates
+        calc_rates =  super().PE_rate(new_query)
+        return calc_rates
+    #Extrapolation routine works here
+    def extrapolate(self,query_inputs,calc_rates):
+        return self.extrapolate_master(query_inputs,calc_rates)
 
 """
 Functions for testing
