@@ -72,12 +72,13 @@ class FRIED_2DInterpolator(FRIEDgrid):
         select_MUV  = select_mass * select_UV
 
         if sum(select_mass)==0 and sum(select_UV)==0:
-            raise NotImplementedError("This stellar mass and FUV field are not in the FRIED grid... currently not set up to interpolate between in 4D")
+            raise NotImplementedError("This stellar mass and FUV field are not in the FRIED grid... currently not set up to pre-interpolate between in 4D")
         
         elif sum(select_mass)==0:
             # Pre-interpolate mass
             if 6 not in use_keys:
                 raise NotImplementedError("This stellar mass ({}) is not in the FRIED grid... currently not set up to interpolate between unless using fractional mass".format(M_star))
+            print("Pre-interpolating mass")
             grid_inputs_3D = self.grid_parameters[select_UV,:]    # Apply filter
             values_3D = self.grid_rate[select_UV]
             M_dot_interp_3D = interpolate.LinearNDInterpolator(grid_inputs_3D[:,(0,use_keys[0],use_keys[1])], values_3D)
@@ -87,6 +88,7 @@ class FRIED_2DInterpolator(FRIEDgrid):
 
         elif sum(select_UV)==0:
             # Pre-interpolate UV
+            print("Pre-interpolating UV")
             grid_inputs_3D = self.grid_parameters[select_mass,:]    # Apply filter
             values_3D = self.grid_rate[select_mass]
             M_dot_interp_3D = interpolate.LinearNDInterpolator(np.log10(grid_inputs_3D[:,(1,use_keys[0],use_keys[1])]), values_3D)

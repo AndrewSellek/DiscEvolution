@@ -48,9 +48,9 @@ class FRIEDv2grid(object):
         ## Values given in linear space apart from M_dot which is given as its base 10 logarithm
         data_dir = os.path.join(os.path.dirname(__file__)+'/FRIEDGRIDv2/')
         # Take M_star, R_disc, Sigma_1AU, Sigma_disc, UV to build parameter space
-        self.grid_parameters = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=(0,1,2,3,4))#, names=('M_star','R_disc', 'Sigma_1AU', 'Sigma_disc', 'UV'))
+        self.grid_parameters = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=(0,1,2,3,4),dtype=float,delimiter=', ')#, names=('M_star','R_disc', 'Sigma_1AU', 'Sigma_disc', 'UV'))
         # Import M_dot
-        self.grid_rate = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=5)
+        self.grid_rate = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=5,dtype=float,delimiter=', ')
 
         # Calculate mass and add to grid as column 5
         M_disc  = 2*np.pi*self.grid_parameters[:,3]*(self.grid_parameters[:,1]*cst.AU)**2/cst.Mjup
@@ -85,6 +85,7 @@ class FRIEDv2_2DInterpolator(FRIEDv2grid):
 
         if sum(select_UV)==0:
             # Pre-interpolate UV
+            print("Pre-interpolating UV")
             M_dot_interp_3D = interpolate.LinearNDInterpolator(np.log10(self.grid_parameters[:,(4,use_keys[0],use_keys[1])]), self.grid_rate)
             select_unique = (np.abs(self.grid_parameters[:,4] - 1)<0.001)
             # Now build the main interpolator            
@@ -148,7 +149,7 @@ class FRIED_2DS1(FRIEDv2_2DInterpolator):
 class FRIED_2DM400(FRIED_2DS1):
     # Interpolates on Sigma_1AU (S1); alias for for FRIED_2DS1 for backwards compatibility
     def __init__(self, M_star, UV):
-        raise Warning("M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
+        print("Note: M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
         super().__init__(M_star, UV)
         
 """
@@ -217,13 +218,13 @@ class FRIED_2DS1M(FRIED_2DS1):
 class FRIED_2DM400S(FRIED_2DS1S):
     # Interpolates on Sigma_1AU (S1); alias for for FRIED_2DS1S for backwards compatibility
     def __init__(self, M_star, UV):
-        raise Warning("M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
+        print("Note: M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
         super().__init__(M_star, UV)
 
 class FRIED_2DM400M(FRIED_2DS1M):
     # Interpolates on Sigma_1AU (S1); alias for for FRIED_2DS1M for backwards compatibility
     def __init__(self, M_star, UV):
-        raise Warning("M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
+        print("Note: M400 not used for the v2 grid, replaced by 'official' grid parameter Sigma_1AU (entirely equivalent)")
         super().__init__(M_star, UV)
 
 """
