@@ -158,7 +158,7 @@ class FRIED_2DM400(FRIED_2DS1):
 class FRIED_2DMS(FRIED_2DM):
     # Interpolates on mass (M) but is provided with surface density (S)
     def PE_rate(self, query_inputs,extrapolate=True):
-        new_query = np.array(quey_inputs) # New array to hold modified query
+        new_query = np.array(query_inputs) # New array to hold modified query
         # Clip densities to ones in grid for calculating rates
         if extrapolate:
             re_Sigma = np.minimum(query_inputs[0], self.Sigma_max(query_inputs[1]))
@@ -230,81 +230,85 @@ class FRIED_2DM400M(FRIED_2DS1M):
 """
 Functions for testing
 """
-def D2_space(interp_type = '400', extrapolate=True, UV=1000, M_star = 1.0, save=True, title=False, markers=False):
+def D2_space_v2(interp_type = 'S1S', extrapolate=True, UV=1000, M_star = 1.0, title=False, markers=False, ax=None, disc=None):
         # Function for plotting mass loss rates as function of R and Sigma
 
         # Setup interpolator
-        if (interp_type == 'MS'):
-            photorate = FRIED_2DMS(M_star,UV)
-        elif (interp_type == 'S'):
+        if (interp_type == 'S'):
             photorate = FRIED_2DS(M_star,UV)
-        elif (interp_type == '400'):
-            photorate = FRIED_2DM400S(M_star,UV)
+        elif (interp_type == 'MS'):
+            photorate = FRIED_2DMS(M_star,UV)
+        elif (interp_type == 'S1S'):
+            photorate = FRIED_2DS1S(M_star,UV)
 
         # Setup interpolation grid
-        R = np.linspace(1,400,1600,endpoint=True)
-        Sigma = np.logspace(-5,3,81)
+        R = np.linspace(1,500,2000,endpoint=True)
+        Sigma = np.logspace(-5,5,101)
         (R_interp, Sigma_interp) = np.meshgrid(R,Sigma)
 
         # Interpolate
         rates = photorate.PE_rate((Sigma_interp,R_interp))
 
-        # Prepare for plotting
-        plt.rcParams['text.usetex'] = "True"
-        plt.rcParams['font.family'] = "serif"
-        fig = plt.figure()
-
         # Plot
-        n_levels = 15*(2-save) 
-        pcm = plt.contourf(R_interp,Sigma_interp,rates,levels=np.logspace(-11,-4,n_levels),norm=colors.LogNorm(vmin=1e-11,vmax=1e-4,clip=True),extend='min')
-        Sig_max = Sigma_max(R,M_star)
-        Sig_min = Sigma_min(R,M_star)
-        plt.plot(R,Sig_max,linestyle='--',color='red',label='$\Sigma_{max}$')
-        plt.plot(R,Sig_min,linestyle='--',color='red',label='$\Sigma_{min}$')
+        n_levels = 25#*(2-save) 
+        pcm = ax.contourf(R_interp,Sigma_interp,rates,levels=np.logspace(-16,-4,n_levels),norm=colors.LogNorm(vmin=1e-16,vmax=1e-4,clip=True),extend='min')
+        Sig_max = photorate.Sigma_max(R)
+        Sig_min = photorate.Sigma_min(R)
+        ax.plot(R,Sig_max,linestyle='--',color='red',label='$\Sigma_{max}$')
+        ax.plot(R,Sig_min,linestyle='--',color='red',label='$\Sigma_{min}$')
 
         # Can show the actual points where the calculations are made    
         if markers:
             grid_inputs_2D = photorate.Sigma_inputs
-            plt.plot(grid_inputs_2D[:,1],grid_inputs_2D[:,0],marker='x',color='black',linestyle='None')
+            ax.plot(grid_inputs_2D[:,1],grid_inputs_2D[:,0],marker='x',color='black',linestyle='None')
+
+        # Superpose a disc profile
+        if not disc is None:
+            p, = ax.plot(disc[0], disc[1], color='white', linestyle='--')
+            discrates = photorate.PE_rate((disc[1],disc[0]))
+            locmax = np.nanargmax(discrates)
+            ax.plot(disc[0][locmax], disc[1][locmax], color=p.get_color(), linestyle='', marker='+')
 
         # Adorn plot
-        plt.xscale('log')
-        plt.yscale('log')
-        plt.xlabel('$R~/\mathrm{AU}$',fontsize=18)
-        plt.ylabel('$\Sigma~/\mathrm{g~cm}^{-2}$', fontsize=18)
-        plt.tick_params(axis='x', which='major', labelsize=14)
-        plt.tick_params(axis='y', which='major', labelsize=14)
-        plt.xlim([1,400])
-        plt.ylim([1e-5,1e3])
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_xlabel('$R~/\mathrm{AU}$',fontsize=14)
+        ax.set_ylabel('$\Sigma~/\mathrm{g~cm}^{-2}$', fontsize=14)
+        ax.tick_params(axis='both', which='major', labelsize=12)
+        ax.set_xlim([1,500])
+        ax.set_ylim([1e-5,1e5])
         bar_label='Mass Loss Rate ($M_\odot~\mathrm{yr}^{-1}$)'
-        cbar = plt.colorbar(pcm)
-        cbar.ax.tick_params(labelsize=14) 
-        cbar.set_label(label=bar_label, fontsize=18)
+        cbar = plt.colorbar(pcm, ax=ax)
+        cbar.ax.tick_params(labelsize=12) 
+        cbar.set_label(label=bar_label, fontsize=14)
     
         # Add a title, if desired
         if title:
-            if (interp_type == 'MS'):
-                plt.title("Interpolation on $M(\Sigma)$",fontsize=24)
-            elif (interp_type == 'S'):
-                plt.title("Interpolation on $\Sigma$",fontsize=24)
-            elif (interp_type == '400'):
-                plt.title("Interpolation on $M_{400}(\Sigma)$",fontsize=24)
-
-        # Either save the figure or return it
-        if save:
-            plt.tight_layout()
-            plt.savefig('Interpolation_'+interp_type+'_'+str(UV)+'.png')
-            plt.savefig('Interpolation_'+interp_type+'_'+str(UV)+'.pdf')
-            plt.show()
-        else:
-            return fig
+            if (interp_type == 'S'):
+                ax.title("Interpolation on $\Sigma$",fontsize=24)
+            elif (interp_type == 'MS'):
+                ax.title("Interpolation on $M(\Sigma)$",fontsize=24)
+            elif (interp_type == 'S1S'):
+                ax.title("Interpolation on $\Sigma_{1\,{\\rm au}}(\Sigma)$",fontsize=24)
 
 if __name__ == "__main__":
     # If run as main, create plot showing the interpolation as function of R and Sigma
+    plt.rcParams['text.usetex'] = "True"
+    plt.rcParams['font.family'] = "serif"
+    cm = 1/2.54
+    fig, ax = plt.subplots(1,1,figsize=(6*cm,6*cm))
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--FUV", "-u", type=float, default=1000)
+    parser.add_argument("--save", "-s", action='store_true')
     args = parser.parse_args()
 
-    D2_space(interp_type='400', extrapolate=True, UV=args.FUV, markers=True)
+    D2_space_v2(interp_type='S1S', extrapolate=True, UV=args.FUV, markers=True, ax=ax)
 
-
+    # Save and/or show the figure
+    fig.tight_layout()
+    if args.save:
+        fig.savefig('Interpolation_'+'S1S'+'_'+str(UV)+'.png')
+        fig.savefig('Interpolation_'+'S1S'+'_'+str(UV)+'.pdf')
+    plt.show()
+    
