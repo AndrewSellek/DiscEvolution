@@ -213,7 +213,7 @@ def Facchini_limit(disc, Mdot):
     rho = disc._rho_s
     v_th = np.sqrt(8/np.pi) * disc.cs
     
-    a_entr = (v_th * Mdot) / (self._Mstar * 4 * np.pi * F * rho)
+    a_entr = (v_th * Mdot) / (disc.star.M * 4 * np.pi * F * rho)
     a_entr *= Msun / AU**2 / yr
     return a_entr
 
@@ -341,6 +341,13 @@ class FRIEDExternalEvaporationBase(ExternalPhotoevaporationBase):
     @property
     def floor(self):
         return self.FRIED_Rates._floor
+        
+    def ASCII_header(self):
+        return ("# {}: version {}, {} M_sol, {} G0".format(self.__class__.__name__,self._versionFRIED,self.FRIED_Rates._M_star,self._FUV))
+
+    def HDF5_attributes(self):
+        header = {}
+        return self.__class__.__name__, header
 
 class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
     """External photoevaporation flow with a mass loss rate which is dependent on radius and surface density.
@@ -350,13 +357,6 @@ class FRIEDExternalEvaporationS(FRIEDExternalEvaporationBase):
         super().__init__(disc, **kwargs)
         self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DS(self._Mstar,self._FUV)
         self._density = True
-
-    def ASCII_header(self):
-        return ("# FRIEDExternalEvaporationS: {} G0".format(self._FUV))
-
-    def HDF5_attributes(self):
-        header = {}
-        return self.__class__.__name__, header
 
 class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
     """
@@ -368,13 +368,6 @@ class FRIEDExternalEvaporationMS(FRIEDExternalEvaporationBase):
         super().__init__(disc, **kwargs)
         self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400S(self._Mstar,self._FUV)
         self._density = True
-
-    def ASCII_header(self):
-        return ("# FRIEDExternalEvaporationMS: {} G0".format(self._FUV))
-
-    def HDF5_attributes(self):
-        header = {}
-        return self.__class__.__name__, header
 
 class FRIEDExternalEvaporationfMS(FRIEDExternalEvaporationBase):
     """
@@ -388,13 +381,6 @@ class FRIEDExternalEvaporationfMS(FRIEDExternalEvaporationBase):
         self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DfM400S(self._Mstar,self._FUV)
         self._density = True
 
-    def ASCII_header(self):
-        return ("# FRIEDExternalEvaporationfMS: {} G0".format(self._FUV))
-
-    def HDF5_attributes(self):
-        header = {}
-        return self.__class__.__name__, header
-
 class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
     """
     External photoevaporation flow with a mass loss rate which is dependent on radius and integrated mass interior.
@@ -405,13 +391,6 @@ class FRIEDExternalEvaporationM(FRIEDExternalEvaporationBase):
         super().__init__(disc, **kwargs)
         self.FRIED_Rates = eval("photorate_v{}".format(self._versionFRIED)).FRIED_2DM400M(self._Mstar,self._FUV)
         self._density = False
-
-    def ASCII_header(self):
-        return ("# FRIEDExternalEvaporationM: {} G0".format(self._FUV))
-
-    def HDF5_attributes(self):
-        header = {}
-        return self.__class__.__name__, header
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt

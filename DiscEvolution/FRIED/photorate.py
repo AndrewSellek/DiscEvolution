@@ -43,10 +43,10 @@ class FRIEDgrid(object):
         self.grid_parameters = np.hstack((self.grid_parameters,M_frac))
 
     def Sigma_min(self, R):
-        return self._Mfrac_min * self._Mstar*cst.Msun / (2*np.pi*R*400*cst.AU**2)
+        return self._Mfrac_min * self._M_star*cst.Msun / (2*np.pi*R*400*cst.AU**2)
         
     def Sigma_max(self, R):
-        return self._Mfrac_max * self._Mstar*cst.Msun / (2*np.pi*R*400*cst.AU**2)
+        return self._Mfrac_max * self._M_star*cst.Msun / (2*np.pi*R*400*cst.AU**2)
 
     def PE_rate(self, query_inputs, extrapolate=False):
         query_log = tuple(np.log10(query_inputs))           # Take logarithm of input values
@@ -65,7 +65,7 @@ class FRIED_2DInterpolator(FRIEDgrid):
         super().__init__()
         
         # Select correct subgrid and build the interpolator
-        self._Mstar = M_star
+        self._M_star = M_star
         self._UV    = UV
         select_mass = (np.abs(self.grid_parameters[:,0] - M_star)<0.001) # Filter based on ones with the correct mass
         select_UV   = (np.abs(self.grid_parameters[:,1] - UV)<0.001)     # Filter based on ones with the correct UV
@@ -209,12 +209,12 @@ class FRIED_2DfM400S(FRIED_2DfM400):
         new_query = np.array(query_inputs) # New array to hold modified query
         # Clip densities to ones in grid for calculating rates
         if extrapolate:
-            re_Sigma = np.minimum(query_inputs[0], self.Sigma_max(query_inputs[1],self._Mstar))
-            re_Sigma = np.maximum(re_Sigma, self.Sigma_min(query_inputs[1],self._Mstar))
+            re_Sigma = np.minimum(query_inputs[0], self.Sigma_max(query_inputs[1],self._M_star))
+            re_Sigma = np.maximum(re_Sigma, self.Sigma_min(query_inputs[1],self._M_star))
         else:
             re_Sigma = query_inputs[0]
         # Convert sigma to a disc mass at 400 AU (for 1/R profile) and replace in query
-        fMass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Msun * self._Mstar)
+        fMass_400 = 2*np.pi * re_Sigma * (query_inputs[1]*cst.AU) * (400*cst.AU) / (cst.Msun * self._M_star)
         new_query[0] = fMass_400 # Replace first query parameter with mass
         # Calculate rates
         calc_rates =  super().PE_rate(new_query)

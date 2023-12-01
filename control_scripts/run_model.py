@@ -171,9 +171,9 @@ def setup_disc(model):
         except KeyError:
             T_ext = 39000
         if perturbation:
-            eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field, T_ext=T_ext)
-        else:
             eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field, T_ext=T_ext, ptbn_kwargs=ptbn_kwargs)
+        else:
+            eos = ExternalHeatEOS(star, p['h0'], p['q'], model['disc']['alpha'], mu=mu, G_0=FUV_field, T_ext=T_ext)
     elif p['type'] == 'iso':
         if R_alpha:
             eos = TanhAlphaEOS(star, p['h0'], p['q'], 
