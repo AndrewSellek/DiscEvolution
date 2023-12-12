@@ -97,8 +97,8 @@ def setup_wrapper(model, restart, output=True):
         except AttributeError:
             pass
         if disc.chem:
-            #for spec in disc.chem.gas.species:
-            #    disc.chem.gas[spec][optically_thin] = 0.
+            for spec in disc.chem.gas.species:
+                disc.chem.gas[spec][optically_thin] = 0.
             for spec in disc.chem.ice.species:
                 disc.chem.ice[spec][optically_thin] = 0.
     

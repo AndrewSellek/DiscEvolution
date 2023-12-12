@@ -77,7 +77,8 @@ class DiscEvolutionDriver(object):
         if self._external_photo and hasattr(self._external_photo,"_density"): # If we are using density to calculate mass loss rates, we need to limit the time step based on photoevaporation
             (dM_dot, dM_gas) = self._external_photo.optically_thin_weighting(disc)
             Dt = dM_gas[(dM_dot>0)] / dM_dot[(dM_dot>0)]
-            Dt_min = np.nanmin(Dt)
+            stability_no=1.0/3.0 # Fudge to make sure cell doesn't completely drain to avoid risk of overflow in the dust/abundance measurements
+            Dt_min = stability_no*np.nanmin(Dt)
             dt = min(dt,Dt_min)
         
         # Determine tracers for dust step
@@ -139,20 +140,22 @@ class DiscEvolutionDriver(object):
             self._chemistry.update(dt, T, rho, eps, f_small, disc.R, disc.Sigma_G, disc.chem, 
                                    grain_size=grain_size)
 
-            # If we have dust, we should update it now the ice fraction has
-            # changed
+            # Clean values
+            disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)
+            disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
+            disc.chem.gas.data[:] /= np.maximum(disc.chem.gas.data.sum(0)/(1-disc.dust_frac.sum(0)), 1.0)
+            disc.chem.ice.data[:] /= np.maximum(disc.chem.ice.data.sum(0)/disc.dust_frac.sum(0), 1.0)
+            disc.chem.gas.data[:] = np.fmax(disc.chem.gas.data, 0)
+            disc.chem.ice.data[:] = np.fmax(disc.chem.ice.data, 0)
+
+            # If we have dust, we should update it now the ice fraction has changed
             disc.update_ices(disc.chem.ice)            
 
-        # Pin the values to >= 0 and <=1:
+        # Pin the dust to >= 0 and <=1:
         disc.Sigma[:] = np.maximum(disc.Sigma, 0)        
         try:
             disc.dust_frac[:] = np.maximum(disc.dust_frac, 0)
             disc.dust_frac[:] /= np.maximum(disc.dust_frac.sum(0), 1.0)
-        except AttributeError:
-            pass
-        try:
-            disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)
-            disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
         except AttributeError:
             pass
 
