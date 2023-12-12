@@ -43,14 +43,16 @@ class FRIEDv2grid(object):
         self._PAH    = PAH
         self._dust   = dust
         
-        # Load data from FRIED table (Haworth et al 2018)
+        # Load data from FRIEDv2 table (Haworth et al 2023)
         ## Data listed as M_star, R_disc, Sigma_1AU, Sigma_disc, UV, M_dot
         ## Values given in linear space apart from M_dot which is given as its base 10 logarithm
-        data_dir = os.path.join(os.path.dirname(__file__)+'/FRIEDGRIDv2/')
-        # Take M_star, R_disc, Sigma_1AU, Sigma_disc, UV to build parameter space
-        self.grid_parameters = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=(0,1,2,3,4),dtype=float,delimiter=', ')#, names=('M_star','R_disc', 'Sigma_1AU', 'Sigma_disc', 'UV'))
+        data_dir  = os.path.join(os.path.dirname(__file__)+'/FRIEDGRIDv2/')
+        grid_file = "FRIEDv2_{}Msol_fPAH{}_{}.dat".format(str(self._M_star).replace('.','p'),str(self._PAH).replace('.','p'),str(self._dust).replace('.','p'))
+        print("Loading FRIED v2 from subgrid file", grid_file)
+        # Take M_star, R_disc, Sigma_1AU, Sigma_disc, UV to build parameter space        
+        self.grid_parameters = np.genfromtxt(os.path.join(data_dir, grid_file), usecols=(0,1,2,3,4), dtype=float, delimiter=', ')
         # Import M_dot
-        self.grid_rate = np.genfromtxt(os.path.join(data_dir, "FRIEDv2_1p0Msol_fPAH1p0_growth.dat"),usecols=5,dtype=float,delimiter=', ')
+        self.grid_rate       = np.genfromtxt(os.path.join(data_dir, grid_file),usecols=5,dtype=float,delimiter=', ')
 
         # Calculate mass and add to grid as column 5
         M_disc  = 2*np.pi*self.grid_parameters[:,3]*(self.grid_parameters[:,1]*cst.AU)**2/cst.Mjup
