@@ -46,7 +46,10 @@ class FRIEDv2grid(object):
         # Load data from FRIEDv2 table (Haworth et al 2023)
         ## Data listed as M_star, R_disc, Sigma_1AU, Sigma_disc, UV, M_dot
         ## Values given in linear space apart from M_dot which is given as its base 10 logarithm
-        data_dir  = os.path.join(os.path.dirname(__file__)+'/FRIEDGRIDv2/')
+        if os.path.dirname(__file__)=='':
+            data_dir  = 'FRIEDGRIDv2/'          
+        else:
+            data_dir  = os.path.join(os.path.dirname(__file__)+'/FRIEDGRIDv2/')
         grid_file = "FRIEDv2_{}Msol_fPAH{}_{}.dat".format(str(self._M_star).replace('.','p'),str(self._PAH).replace('.','p'),str(self._dust).replace('.','p'))
         print("Loading FRIED v2 from subgrid file", grid_file)
         # Take M_star, R_disc, Sigma_1AU, Sigma_disc, UV to build parameter space        
@@ -303,25 +306,69 @@ def D2_space_v2(interp_type = 'S1S', extrapolate=True, UV=1000, M_star = 1.0, ti
                 ax.title("Interpolation on $M(\Sigma)$",fontsize=24)
             elif (interp_type == 'S1S'):
                 ax.title("Interpolation on $\Sigma_{1\,{\\rm au}}(\Sigma)$",fontsize=24)
+def rad_prof_v2(interp_type = 'S1S', extrapolate=True, UV=1000, M_star = 1.0, title=False, markers=False, ax=None, discs=[None]):
+        # Function for plotting mass loss rates as function of R and Sigma
+
+        # Setup interpolator
+        if (interp_type == 'S'):
+            photorate = FRIED_2DS(M_star,UV)
+        elif (interp_type == 'MS'):
+            photorate = FRIED_2DMS(M_star,UV)
+        elif (interp_type == 'S1S'):
+            photorate = FRIED_2DS1S(M_star,UV)
+
+        # Setup interpolation grid
+        R = np.linspace(5,500,2000,endpoint=True)
+        for Sigma1 in np.logspace(0,5,6):
+            Sigma = Sigma1/R*np.exp(-R/100)
+
+            # Interpolate
+            rates = photorate.PE_rate((Sigma,R), extrapolate=extrapolate)
+            p, = ax.plot(R, rates/Sigma)
+
+            # Approximate
+            #pfit = np.polyfit(np.log10(R)[R>200], np.log10(rates/Sigma)[R>200], 1)
+            #print(pfit)
+            #p, = ax.plot(R[R>200], 10**np.polyval(pfit,np.log10(R)[R>200]), color=p.get_color(), linestyle='--')        
+
+        # Adorn plot
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_xlabel('$R~/\mathrm{AU}$',fontsize=14)
+        ax.set_ylabel('$\dot{M}/\Sigma$', fontsize=14)
+        ax.tick_params(axis='both', which='major', labelsize=12)
+        ax.set_xlim([1,500])
+        #ax.set_ylim([1e-5,1e5])
+    
+        # Add a title, if desired
+        if title:
+            if (interp_type == 'S'):
+                ax.title("Interpolation on $\Sigma$",fontsize=24)
+            elif (interp_type == 'MS'):
+                ax.title("Interpolation on $M(\Sigma)$",fontsize=24)
+            elif (interp_type == 'S1S'):
+                ax.title("Interpolation on $\Sigma_{1\,{\\rm au}}(\Sigma)$",fontsize=24)
 
 if __name__ == "__main__":
     # If run as main, create plot showing the interpolation as function of R and Sigma
     plt.rcParams['text.usetex'] = "True"
     plt.rcParams['font.family'] = "serif"
     cm = 1/2.54
-    fig, ax = plt.subplots(1,1,figsize=(6*cm,6*cm))
+    fig, ax = plt.subplots(2,1,figsize=(12*cm,6*cm))
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--FUV", "-u", type=float, default=1000)
+    parser.add_argument("--Mstar", "-M", type=float, default=1.0)
     parser.add_argument("--save", "-s", action='store_true')
     args = parser.parse_args()
 
-    D2_space_v2(interp_type='S1S', extrapolate=True, UV=args.FUV, markers=True, ax=ax)
+    D2_space_v2(interp_type='S1S', extrapolate=True, UV=args.FUV, markers=True, ax=ax[0])
+    rad_prof_v2(interp_type='S1S', extrapolate=True, UV=args.FUV, markers=True, ax=ax[1])
 
     # Save and/or show the figure
     fig.tight_layout()
     if args.save:
-        fig.savefig('Interpolation_'+'S1S'+'_'+str(UV)+'.png')
-        fig.savefig('Interpolation_'+'S1S'+'_'+str(UV)+'.pdf')
+        fig.savefig('Interpolation_'+'S1S'+'_'+str(args.FUV)+'.png')
+        fig.savefig('Interpolation_'+'S1S'+'_'+str(args.FUV)+'.pdf')
     plt.show()
     
