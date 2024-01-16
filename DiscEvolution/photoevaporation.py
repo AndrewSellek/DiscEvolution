@@ -150,8 +150,10 @@ class ExternalPhotoevaporationBase(object):
                     M_ent_gas = np.zeros_like(M_ent)
                     atom_ice = disc.chem.ice.atomic_abundance()[atom]/disc.chem.ice.total_abund         # Mass abundances of atoms / ice mass = mass fraction in ice
                     atom_gas = disc.chem.gas.atomic_abundance()[atom]/(1-disc.chem.ice.total_abund)     # Mass abundances of atoms / gas mass = mass fraction in gas
-                    M_ent_ice[(dM_gas > 0)] = M_ent_w[(dM_gas > 0)]*atom_ice[(dM_gas > 0)]              # Mass of atom in removed gas
-                    M_ent_gas[(dM_gas > 0)] = dM_evap[(dM_gas > 0)]*atom_gas[(dM_gas > 0)]              # Mass of atom in removed ice
+                    atom_ice[np.isinf(atom_ice)] = 0                                                # Inf if denominator = 0 < numerator -> should be none so set to 0 
+                    atom_gas[np.isinf(atom_gas)] = 0                                                # Inf if denominator = 0 < numerator -> should be none so set to 0
+                    M_ent_ice[(dM_gas > 0)] = M_ent_w[(dM_gas > 0)]*atom_ice[(dM_gas > 0)]              # Mass of atom in removed ice
+                    M_ent_gas[(dM_gas > 0)] = dM_evap[(dM_gas > 0)]*atom_gas[(dM_gas > 0)]              # Mass of atom in removed gas
                     self._Mcum_chem[atom] += np.nansum(M_ent_ice+M_ent_gas)                             # Cumulative mass lost
                     self._wind_abun[atom]  = np.nansum(M_ent_ice+M_ent_gas)/np.nansum(M_ent_w+dM_evap)  # Current composition
                 self._wind_abun['d'] = M_ent_w.sum()/np.nansum(M_ent_w+dM_evap)                         # Dust mass fraction in wind
