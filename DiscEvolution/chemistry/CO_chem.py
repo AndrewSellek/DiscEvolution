@@ -3,7 +3,6 @@ from operator import xor
 import numpy as np
 from ..constants import *
 from .base_chem import ChemicalAbund, MolecularIceAbund
-from .base_chem import SimpleChemBase, StaticChem, ThermalChem
 from .base_chem import TimeDependentChem, EquilibriumChem
 
 ################################################################################
@@ -235,16 +234,6 @@ class COChemMadhu(object):
 ###############################################################################
 # Combined Models
 ###############################################################################
-class SimpleCOChemOberg(COChemOberg, StaticChem):
-    def __init__(self, **kwargs):
-        COChemOberg.__init__(self)
-        StaticChem.__init__(self, **kwargs)
-
-class SimpleCOChemMadhu(COChemMadhu, StaticChem):
-    def __init__(self, **kwargs):
-        COChemMadhu.__init__(self)
-        StaticChem.__init__(self, **kwargs)
-
 class TimeDepCOChemOberg(COChemOberg, TimeDependentChem):
     def __init__(self, **kwargs):
         COChemOberg.__init__(self)

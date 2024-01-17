@@ -3,9 +3,7 @@ from operator import xor
 import numpy as np
 from ..constants import *
 from .base_chem import ChemicalAbund, MolecularIceAbund
-from .base_chem import SimpleChemBase, StaticChem, ThermalChem
 from .base_chem import TimeDependentChem, EquilibriumChem
-
 
 ################################################################################
 # Simple CNO Chemistry wrappers
@@ -306,19 +304,7 @@ class CNOChemMadhu(object):
 ###############################################################################
 # Combined Models
 ###############################################################################
-class SimpleCNOChemOberg(CNOChemOberg, StaticChem):
-    def __init__(self, fNH3=None, **kwargs):
-        CNOChemOberg.__init__(self, fNH3)
-        StaticChem.__init__(self, **kwargs)
-
-
-class SimpleCNOChemMadhu(CNOChemMadhu, StaticChem):
-    def __init__(self, fNH3=None, **kwargs):
-        CNOChemMadhu.__init__(self, fNH3)
-        StaticChem.__init__(self, **kwargs)
-
-
-class TimeDepCNOChemOberg(CNOChemOberg, TimeDependentChem):
+cclass TimeDepCNOChemOberg(CNOChemOberg, TimeDependentChem):
     def __init__(self, fNH3=None, **kwargs):
         CNOChemOberg.__init__(self, fNH3)
         TimeDependentChem.__init__(self, **kwargs)

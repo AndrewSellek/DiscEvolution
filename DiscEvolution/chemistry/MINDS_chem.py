@@ -3,9 +3,7 @@ from operator import xor
 import numpy as np
 from ..constants import *
 from .base_chem import ChemicalAbund, MolecularIceAbund
-from .base_chem import SimpleChemBase, StaticChem, ThermalChem
 from .base_chem import TimeDependentChem, EquilibriumChem
-
 
 ################################################################################
 # Simple Chemistry wrappers
@@ -195,12 +193,6 @@ class ChemMINDS(object):
 ###############################################################################
 # Combined Models
 ###############################################################################
-class SimpleChemMINDS(ChemMINDS, StaticChem):
-    def __init__(self, fNH3=None, **kwargs):
-        ChemMINDS.__init__(self, fNH3)
-        StaticChem.__init__(self, **kwargs)
-
-
 class EquilibriumChemMINDS(ChemMINDS, EquilibriumChem):
     def __init__(self, fNH3=None, fix_ratios=False, fix_grains=True,
                  fix_N=False, **kwargs):

@@ -186,18 +186,6 @@ class SimpleChemBase(object):
     def __init__(self, fix_ratios=True):
 
         self._fix_ratios=fix_ratios
-        
-        # Condensation thresholds
-        # CO, CH4, C02, H20, C-grains, silicate grains
-        self._T_cond  = { 'CO'  : 20,
-                          'CH4' : 30,
-                          'CO2' : 70,
-                          'H2O' : 150,
-                          'N2'  : 18,
-                          'NH3' : 68,
-                          'C-grain'  : 500,
-                          'Si-grain' : 1500,
-                          }
 
     def ASCII_header(self):
         """ASCII_header string"""
@@ -209,9 +197,10 @@ class SimpleChemBase(object):
         return self.__class__.__name__, { "fix_ratios" : self._fix_ratios }
 
     def equilibrium_chem(self, T, rho, dust_frac, f_small, R, SigmaG, abund):
-        """Compute the equilibrium chemistry"""
+        """Compute the equilibrium chemistry
+        Used only to calculate an initial condition"""
 
-        ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, abund)
+        ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, atomic_abund=abund)
         gas = ice.copy()
 
         for spec in ice.species:
@@ -225,6 +214,7 @@ class SimpleChemBase(object):
     def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, **kwargs):
 
         if not self._fix_ratios:
+            # Resetting to equilibrium ratios
             mol_abund  = chem.gas.copy()
             mol_abund += chem.ice
 
@@ -232,6 +222,7 @@ class SimpleChemBase(object):
                                                 mol_abund=mol_abund)
             chem.gas.data[:] = 0
         else:
+            # Advection only
             chem.ice += chem.gas
             chem.gas.data[:] = 0
 
@@ -242,25 +233,6 @@ class SimpleChemBase(object):
                                               spec, chem.ice)
             chem.ice[spec] = ice
             chem.gas[spec] = np.maximum(mtot - ice, 0)
-
-            
-class StaticChem(SimpleChemBase):
-    """Tabulated time independent C/O and O/H chemistry.
-
-    This model works with the atomic abundances for C, O and Si, computing
-    molecular abundances for CO, CH4, CO2, H20, N2, NH3, C-grains and Silicate
-    grains.
-
-    args:
-        fix_ratios : if True molecular ratios will be assumed to be constant
-                     when the ice / gas fractions are calculated
-    """
-    def __init__(self, fix_ratios=True):
-        super(StaticChem, self).__init__(fix_ratios)
-    
-    def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, species, mol_abund):
-        """Equilibrium ice fracion"""
-        return mol_abund[species] * (T < self._T_cond[species])
 
 
 class ThermalChem(object):
@@ -276,8 +248,7 @@ class ThermalChem(object):
         f_stick : Sticking probability.                         default = 1
         muH     : Mean Atomic weight, in m_H.                   default = 1.28
     """
-    def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5,
-                 f_bind=1.0, f_stick=1.0, mu=1.28):
+    def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5, f_bind=1.0, f_stick=1.0, mu=1.28):
         self._Tbind = { 
             # From KIDA database
             'CO' : 1150., 'CH4' : 1300.,
@@ -297,7 +268,7 @@ class ThermalChem(object):
         # X_max = (d2g) * eta * Nbind
         #      When X_ice > X_max all first layer binding sites on the
         #      grain are covered. Thus the desorption rate is limited to be
-        #      proportional to min(X_ice, X_max)
+        #      proportional to min(X_ice, X_max) i.e. zeroth order
         N_bind = sig_b * 4*np.pi * a**2 * f_bind
         self._etaNbind = eta*N_bind
         
@@ -310,9 +281,8 @@ class ThermalChem(object):
         
         self._mu = mu
 
-        
-        head = ('sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, '
-                'f_bind: {}, f_stick: {}, muH: {}')
+        # Create basic header
+        head = 'sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, f_bind: {}, f_stick: {}, muH: {}'
         self._head = head.format(sig_b, rho_s, a, f_bind, f_stick, mu)
 
     def ASCII_header(self):
@@ -365,8 +335,6 @@ class ThermalChem(object):
 
         if 'grain' in spec:
             # Smooth at the freeze out temperature
-            # th = T / self._T_cond[spec]
-            # f = 0.5*(1 + np.tanh(20*(th-1)))
             f = 0
             X_t = abund.ice[spec] + abund.gas[spec]
 
@@ -426,8 +394,8 @@ class ThermalChem(object):
         abund.gas[spec] = X_g * m_mol / mu
 
 
-class nonThermalChem(object):
-    """Computes grain thermal and non-thermal adsorption/desorption rates.
+class nonThermalChem(ThermalChem):
+    """Adds non-thermal desorption rates to the ThermalChem class.
 
     Mixin class, to be used with EquilibriumChem.
     EquilibriumChem must also inherit ThermalChem to get the thermal rates
@@ -440,42 +408,12 @@ class nonThermalChem(object):
         f_stick : Sticking probability.                         default = 1
         muH     : Mean Atomic weight, in m_H.                   default = 1.28
     """
-    def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5,
-                 f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True, AV_rad=True, CR_rate=1e-17):
-        self._Tbind = { 
-            # From KIDA database
-            'CO' : 1150., 'CH4' : 1300.,
-            'CO2' : 2575., 'H2O' : 5700.,
-            # Fayolle+ (2016), Martin-Domenech+ (2014)
-            'N2'  : 1266,  'NH3' : 2965,
-            }
-                        
-        # Dry CO and N2
-        self._Tbind['CO'] = 850
-        self._Tbind['N2'] = 770 # Fayolle+ (2016)
+    def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5, f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True, AV_rad=True, CR_rate=1e-17):
+                 
+        ThermalChem.__init__(self, sig_b=1.sig_b, rho_s=rho_s., a=a, f_bind=f_bind, f_stick=f_stick, mu=mu)
 
         # Masses
         self._m_mol = {}
-
-        # Number of dust grains per nucleus, eta:
-        m_g = 4*np.pi * rho_s * a**3 / 3
-        eta = mu*m_H / m_g
-        
-        # X_max = (d2g) * eta * Nbind
-        #      When X_ice > X_max all first layer binding sites on the
-        #      grain are covered. Thus the desorption rate is limited to be
-        #      proportional to min(X_ice, X_max)
-        N_bind = sig_b * 4*np.pi * a**2 * f_bind
-        self._etaNbind = eta*N_bind
-        
-        # Cache the thermal adsorption/desorption coefficients
-        self._nu0 = np.sqrt(2 * sig_b * k_B / (m_H *np.pi**2))
-        self._v0  = np.sqrt(8 * k_B / (m_H * np.pi))
-        
-        self._f_des = (1/Omega0) 
-        self._f_ads = (1/Omega0) * np.pi*a**2 * f_stick*eta
-        
-        self._mu = mu
 
         # Fluxes
         self._flux_CR  = CR_rate                                            # Cosmic rays
@@ -518,8 +456,8 @@ class nonThermalChem(object):
             self._f_X = 0.0
 
         # Header
-        head = ('sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, '
-                'f_bind: {}, f_stick: {}, muH: {}, flux_X: {} photon/cm^2/s, flux_CR: {}')
+        head = ('sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, f_bind: {}, f_stick: {}, muH: {}, 
+                'flux_X: {} photon/cm^2/s, flux_CR: {}')
         self._head = head.format(sig_b, rho_s, a, f_bind, f_stick, mu, self._flux_XAU, self._flux_CR)
 
     def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, spec, tot_abund):
