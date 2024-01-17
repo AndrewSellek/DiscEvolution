@@ -31,7 +31,7 @@ from DiscEvolution.chemistry import (
     ChemicalAbund, MolecularIceAbund,
     SimpleCNOAtomAbund, SimpleCNOMolAbund, SimpleH2OAtomAbund, SimpleH2OMolAbund, SimpleAtomAbund, SimpleMolAbund
     EquilibriumCNOChemOberg, TimeDepCNOChemOberg,
-    EquilibriumChemMINDS, TimeDepChemMINDS,
+    EquilibriumChemMINDS,
     EquilibriumCNOChemMadhu,
     EquilibriumH2OChemKalyaan,
 )
@@ -306,13 +306,15 @@ def get_simple_chemistry_model(model):
     if chem_type == 'TimeDep':
         chemistry = TimeDepCNOChemOberg(a=grain_size)
     elif chem_type == 'Madhu':
-        chemistry = EquilibriumCNOChemMadhu(fix_ratios=False, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+        chemistry = EquilibriumCNOChemMadhu(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'Oberg':
-        chemistry = EquilibriumCNOChemOberg(fix_ratios=False, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'Kalyaan':
-        chemistry = EquilibriumH2OChemKalyaan(fix_ratios=True,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+        chemistry = EquilibriumH2OChemKalyaan(fix_ratios=True, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'NoReact':
-        chemistry = EquilibriumCNOChemOberg(fix_ratios=True,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+        chemistry = EquilibriumCNOChemOberg(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+    elif chem_type == 'MINDS':
+        chemistry = EquilibriumChemMINDS(fix_ratios=True,      a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     else:
         raise ValueError("Unknown chemical model type")
 
