@@ -82,12 +82,10 @@ class SimpleMolAbund(ChemicalAbund):
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
                    'H2O', 'O2',
-                   'CO2', 'CO', 'CH3OH', 'CH4'
-                   'NH3', 'N2']
+                   'CO2', 'CO', 'CH3OH', 'CH4']
         mol_mass = [12., 100.,
                     18., 32.,
-                    44., 28., 32., 16.,
-                    17., 28.]
+                    44., 28., 32., 16.]
 
         super(SimpleMolAbund, self).__init__(mol_ids, mol_mass, *sizes)
 
@@ -101,8 +99,6 @@ class SimpleMolAbund(ChemicalAbund):
                         'CO': {'C': 1, 'O': 1, },
                         'CH3OH': {'C': 1, 'O': 1, 'H': 4, },
                         'CH4': {'C': 1, 'H': 4, },
-                        'NH3': {'N': 1, 'H': 3, },
-                        'N2': {'N': 2, },
                         }
 
     def atomic_abundance(self):
@@ -186,7 +182,7 @@ class ChemMINDS(object):
 # Combined Models
 ###############################################################################
 class EquilibriumChemMINDS(ChemMINDS, EquilibriumChem):
-    def __init__(self, fix_ratios=False, **kwargs):
+    def __init__(self, fix_ratios=True, **kwargs):
         assert fix_ratios,"For MINDS chem, no option to reset implemented, cannot run a model with fix_ratios=False"
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
