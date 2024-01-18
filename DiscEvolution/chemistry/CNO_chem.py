@@ -304,7 +304,7 @@ class CNOChemMadhu(object):
 ###############################################################################
 # Combined Models
 ###############################################################################
-cclass TimeDepCNOChemOberg(CNOChemOberg, TimeDependentChem):
+class TimeDepCNOChemOberg(CNOChemOberg, TimeDependentChem):
     def __init__(self, fNH3=None, **kwargs):
         CNOChemOberg.__init__(self, fNH3)
         TimeDependentChem.__init__(self, **kwargs)

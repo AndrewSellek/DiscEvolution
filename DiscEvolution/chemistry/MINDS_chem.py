@@ -154,7 +154,7 @@ class ChemMINDS(object):
         Si = atomic_abund.number_abund('Si')
 
         # Set up the number-density abundances for molecules
-        mol_abund = SimpleCNOMolAbund(atomic_abund.size)
+        mol_abund = SimpleMolAbund(atomic_abund.size)
 
         # Set the grain abundances
         mol_abund['C-grain'] = 0.39 * C
@@ -186,6 +186,11 @@ class EquilibriumChemMINDS(ChemMINDS, EquilibriumChem):
         assert fix_ratios,"For MINDS chem, no option to reset implemented, cannot run a model with fix_ratios=False"
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
+class TimeDepChemMINDS(ChemMINDS, TimeDependentChem):
+    def __init__(self, fNH3=None, **kwargs):
+        raise NotImplementedError
+        ChemMINDS.__init__(self, fNH3)
+        TimeDependentChem.__init__(self, **kwargs)
 
 ###############################################################################
 # Tests

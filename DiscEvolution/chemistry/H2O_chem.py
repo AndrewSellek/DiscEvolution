@@ -3,9 +3,8 @@ from operator import xor
 import numpy as np
 from ..constants import *
 from .base_chem import ChemicalAbund, MolecularIceAbund
-from .base_chem import SimpleChemBase, StaticChem, ThermalChem
+from .base_chem import SimpleChemBase, ThermalChem
 from .base_chem import TimeDependentChem, EquilibriumChem
-
 
 ################################################################################
 # Simple CNO Chemistry wrappers
@@ -170,11 +169,6 @@ class H2OChemKalyaan(object):
 ###############################################################################
 # Combined Models
 ###############################################################################
-class SimpleH2OChemKalyaan(H2OChemKalyaan, StaticChem):
-    def __init__(self, **kwargs):
-        H2OChemKalyaan.__init__(self)
-        StaticChem.__init__(self, **kwargs)
-        
 class EquilibriumH2OChemKalyaan(H2OChemKalyaan, EquilibriumChem):
     def __init__(self, fix_ratios=False, fix_grains=True, **kwargs):
         H2OChemKalyaan.__init__(self, fix_grains)

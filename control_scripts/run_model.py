@@ -29,7 +29,7 @@ import DiscEvolution.photoevaporation as photoevaporation
 
 from DiscEvolution.chemistry import (
     ChemicalAbund, MolecularIceAbund,
-    SimpleCNOAtomAbund, SimpleCNOMolAbund, SimpleH2OAtomAbund, SimpleH2OMolAbund, SimpleAtomAbund, SimpleMolAbund
+    SimpleCNOAtomAbund, SimpleCNOMolAbund, SimpleH2OAtomAbund, SimpleH2OMolAbund, SimpleAtomAbund, SimpleMolAbund,
     EquilibriumCNOChemOberg, TimeDepCNOChemOberg,
     EquilibriumChemMINDS,
     EquilibriumCNOChemMadhu,

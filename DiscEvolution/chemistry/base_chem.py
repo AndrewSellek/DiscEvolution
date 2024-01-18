@@ -258,15 +258,15 @@ class ThermalChem(object):
         ## CO2: Eldridge et al. 2013; Table 1 (pure, multilayer)
         ## CH3OH: Doronin et al. 2015; Fig 3b
         ## CO, O2, CH4: Smith et al. 2016; Table 1 (multilayer)
-        self._Tbind = {'c-ASW':    {'H2O' : 5705., 'O2' : 1107., 'CO2' : 3196., 'CO' : 1390., 'CH3OH' : 6621., 'CH4': 1232.},
-                       'silicate': {'H2O' : 5755., 'O2' : 1385., 'CO2' : 3738., 'CO' : 1365., 'CH3OH' : np.nan, 'CH4': np.nan},
-                       'graphite': {'H2O' : 5792., 'O2' : 1522., 'CO2' : 3243., 'CO' : 1631., 'CH3OH' : 5728., 'CH4': 1593.},
-                       'pure':     {'H2O' : 6722., 'O2' : 1030., 'CO2' : 2980., 'CO' :  910., 'CH3OH' : 4850., 'CH4': 1190.}}
+        self._Tbind =  {'c-ASW':    {'H2O' : 5705., 'O2' : 1107., 'CO2' : 3196., 'CO' : 1390., 'CH3OH' : 6621., 'CH4': 1232.},
+                        'silicate': {'H2O' : 5755., 'O2' : 1385., 'CO2' : 3738., 'CO' : 1365., 'CH3OH' : np.nan, 'CH4': np.nan},
+                        'graphite': {'H2O' : 5792., 'O2' : 1522., 'CO2' : 3243., 'CO' : 1631., 'CH3OH' : 5728., 'CH4': 1593.},
+                        'pure':     {'H2O' : 6722., 'O2' : 1030., 'CO2' : 2980., 'CO' :  910., 'CH3OH' : 4850., 'CH4': 1190.}}
                        
-       self._nu_pre = {'c-ASW':    {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 6.81e16, 'CO' : 9.14e14, 'CH3OH' : 3.18e17, 'CH4': 5.43e13},
-                       'silicate': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
-                       'graphite': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
-                       'pure':     {'H2O' : 1.3e18,  'O2' : 1.3e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14}
+        self._nu_pre = {'c-ASW':    {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 6.81e16, 'CO' : 9.14e14, 'CH3OH' : 3.18e17, 'CH4': 5.43e13},
+                        'silicate': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
+                        'graphite': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
+                        'pure':     {'H2O' : 1.3e18,  'O2' : 1.3e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14}}
 
         # Number of dust grains per nucleus, eta:
         m_g = 4*np.pi * rho_s * a**3 / 3
@@ -409,7 +409,7 @@ class ThermalChem(object):
         abund.gas[spec] = X_g * m_mol / mu
 
 
-class nonThermalChem(ThermalChem):
+class nonThermalChem(object):
     """Adds non-thermal desorption rates to the ThermalChem class.
 
     Mixin class, to be used with EquilibriumChem.
@@ -425,7 +425,7 @@ class nonThermalChem(ThermalChem):
     """
     def __init__(self, sig_b=1.5e15, rho_s=1., a=1e-5, f_bind=1.0, f_stick=1.0, mu=1.28, G0=0, Mstar=1, CR_desorb=True, UV_desorb=True, X_desorb=True, AV_rad=True, CR_rate=1e-17):
                  
-        ThermalChem.__init__(self, sig_b=1.sig_b, rho_s=rho_s., a=a, f_bind=f_bind, f_stick=f_stick, mu=mu)
+        ThermalChem.__init__(self, sig_b=sig_b, rho_s=rho_s, a=a, f_bind=f_bind, f_stick=f_stick, mu=mu)
 
         # Masses
         self._m_mol = {}
@@ -471,7 +471,7 @@ class nonThermalChem(ThermalChem):
             self._f_X = 0.0
 
         # Header
-        head = ('sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, f_bind: {}, f_stick: {}, muH: {}, 
+        head = ('sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, f_bind: {}, f_stick: {}, muH: {}, '
                 'flux_X: {} photon/cm^2/s, flux_CR: {}')
         self._head = head.format(sig_b, rho_s, a, f_bind, f_stick, mu, self._flux_XAU, self._flux_CR)
 
@@ -620,11 +620,11 @@ class EquilibriumChem(ThermalChem,nonThermalChem,SimpleChemBase):
             ThermalChem.__init__(self, **kwargs)
         SimpleChemBase.__init__(self, fix_ratios)
 
-    def _equilibrium_ice_abund(self, *args):
+    def _equilibrium_ice_abund(self, *args, **kwargs):
         if self._nonThermal:
-            ice_abund = nonThermalChem._equilibrium_ice_abund(self, *args)
+            ice_abund = nonThermalChem._equilibrium_ice_abund(self, *args, **kwargs)
         else:
-            ice_abund = ThermalChem._equilibrium_ice_abund(self, *args)
+            ice_abund = ThermalChem._equilibrium_ice_abund(self, *args, **kwargs)
         return ice_abund
             
 
