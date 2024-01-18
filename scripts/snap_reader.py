@@ -71,9 +71,12 @@ class DiscSnap(object):
             elif Nchem == 6:
                 self._chem = chem.MolecularIceAbund(chem.SimpleCOMolAbund(Ndata),
                                                     chem.SimpleCOMolAbund(Ndata))
-            elif Nchem == 8:
+            elif Nchem == 8 and 'N2' in vars:
                 self._chem = chem.MolecularIceAbund(chem.SimpleCNOMolAbund(Ndata),
                                                     chem.SimpleCNOMolAbund(Ndata))
+            elif Nchem == 8 and 'O2' in vars:
+                self._chem = chem.MolecularIceAbund(chem.SimpleMolAbund(Ndata),
+                                                    chem.SimpleMolAbund(Ndata))            
             else:
                 raise AttributeError('Nchem = {}'.format(Nchem) + 
                                      '. Chemistry not recognized')
