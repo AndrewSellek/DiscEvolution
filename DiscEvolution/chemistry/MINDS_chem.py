@@ -17,11 +17,11 @@ class SimpleAtomAbund(ChemicalAbund):
 
         super(SimpleAtomAbund, self).__init__(self.atom_ids, masses, *sizes)
 
-    def set_solar_abundances(self, muH=1.42):
+    def set_solar_abundances(self, muH=1.41):
         """Solar mass fractions of C, N, O, Si and S (Asplund 2021; Table 2)
 
         args:
-            muH : mean atomic mass, default = 1.42
+            muH : mean atomic mass, default = 1.41
         """
         log12 = np.array([12.00, 8.46, 7.83, 8.69, 7.51, 7.12])
         A_abund = np.power(10,log12-12.0)
@@ -29,12 +29,12 @@ class SimpleAtomAbund(ChemicalAbund):
         muH = np.sum(m_abund)
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
 
-    def set_protosolar_abundances(self, muH=1.42):
+    def set_protosolar_abundances(self, muH=1.41):
         """Protoolar mass fractions of C, N, O, Si and S (Asplund 2021; Table B.1)
         Main difference, besides listing isotopes separately, is that all are adjsuted up by ~0.06 to account for atomic diffusion
 
         args:
-            muH : mean atomic mass, default = 1.42
+            muH : mean atomic mass, default = 1.41
         """
         log12 = np.array([12.00, 8.52, 7.89, 8.75, 7.57, 7.16])
         A_abund = np.power(10,log12-12.0)
@@ -42,14 +42,14 @@ class SimpleAtomAbund(ChemicalAbund):
         muH = np.sum(m_abund)
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
 
-    def set_adopted_abundances(self, muH=1.42):
+    def set_adopted_abundances(self, muH=1.41):
         """Adopted mass fractions of C, N, O, Si and S (Sellek et al. in prep)
         Si is solar (Asplund 2021) = cosmic (Nieva & Przybilla 2012)
         C is nebular (Simon-Diaz & Stasinska 2011)
         O is nebular + assumed silicates = intermediate between solar & cosmic
 
         args:
-            muH : mean atomic mass, default = 1.42
+            muH : mean atomic mass, default = 1.41
         """
         A_abund = np.array([1.0, 2.3e-4, 0.0, 5.3e-4, 3.2e-5, 0.0])
         m_abund = np.array(self.masses)*A_abund

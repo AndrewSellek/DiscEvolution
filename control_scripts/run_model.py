@@ -258,6 +258,9 @@ def setup_init_abund_simple(model, disc):
     if model['chemistry']['type']=="Kalyaan":
         X_atom = SimpleH2OAtomAbund(model['grid']['N'])
         X_atom.set_Kalyaan_abundances()
+    elif model['chemistry']['type']=="MINDS":
+        X_atom = SimpleAtomAbund(model['grid']['N'])
+        X_atom.set_adopted_abundances()
     else:
         X_atom = SimpleCNOAtomAbund(model['grid']['N'])
         X_atom.set_solar_abundances()    
