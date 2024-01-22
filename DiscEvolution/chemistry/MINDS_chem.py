@@ -12,8 +12,8 @@ class SimpleAtomAbund(ChemicalAbund):
     """Class to hold the raw atomic abundaces of C/N/O/Si/S for the CNO chemistry"""
 
     def __init__(self, *sizes):
-        self.atom_ids = ['H', 'C', 'N', 'O', 'Si', 'S']
-        masses = [1., 12., 14., 16., 28., 32.]
+        self.atom_ids = ['H', 'He', 'C', 'N', 'O', 'Si', 'S']
+        masses = [1., 4., 12., 14., 16., 28., 32.]
 
         super(SimpleAtomAbund, self).__init__(self.atom_ids, masses, *sizes)
 
@@ -26,8 +26,10 @@ class SimpleAtomAbund(ChemicalAbund):
         log12 = np.array([12.00, 8.46, 7.83, 8.69, 7.51, 7.12])
         A_abund = np.power(10,log12-12.0)
         m_abund = np.array(self.masses)*A_abund
-        muH = np.sum(m_abund)
-        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+        self._AH = np.sum(A_abund)
+        self._muH = np.sum(m_abund)
+        self._mu = self._muH/self._AH
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / self._muH
 
     def set_protosolar_abundances(self, muH=1.41):
         """Protoolar mass fractions of C, N, O, Si and S (Asplund 2021; Table B.1)
@@ -39,8 +41,10 @@ class SimpleAtomAbund(ChemicalAbund):
         log12 = np.array([12.00, 8.52, 7.89, 8.75, 7.57, 7.16])
         A_abund = np.power(10,log12-12.0)
         m_abund = np.array(self.masses)*A_abund
-        muH = np.sum(m_abund)
-        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+        self._AH = np.sum(A_abund)
+        self._muH = np.sum(m_abund)
+        self._mu = self._muH/self._AH
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / self._muH
 
     def set_adopted_abundances(self, muH=1.41):
         """Adopted mass fractions of C, N, O, Si and S (Sellek et al. in prep)
@@ -51,10 +55,12 @@ class SimpleAtomAbund(ChemicalAbund):
         args:
             muH : mean atomic mass, default = 1.41
         """
-        A_abund = np.array([1.0, 2.3e-4, 0.0, 5.3e-4, 3.2e-5, 0.0])
+        A_abund = np.array([1.0, 9.8e-2, 2.3e-4, 0.0, 5.3e-4, 3.2e-5, 0.0])
         m_abund = np.array(self.masses)*A_abund
-        muH = np.sum(m_abund)
-        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+        self._AH = np.sum(A_abund)
+        self._muH = np.sum(m_abund)
+        self._mu = self._muH/self._AH
+        self._data[:] = np.outer(m_abund, np.ones(self.size)) / self._muH
 
     def set_mass_abundances(self, muH=1.41):
         """Mass abundance fractions of C, N, O, Si and S.
@@ -63,8 +69,7 @@ class SimpleAtomAbund(ChemicalAbund):
             muH : mean atomic mass, default = 1.41
         """
         m_abund = np.array(self.masses)
-        muH = np.sum(m_abund)
-        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+        self._data[:] = np.outer(m_abund, np.ones(self.size))
 
     def set_unit_abundances(self, muH=1.41):
         """Unit abundance fractions of C, N, O and Si.
@@ -73,8 +78,21 @@ class SimpleAtomAbund(ChemicalAbund):
             muH : mean atomic mass, default = 1.41
         """
         m_abund = np.ones_like(self.masses)
-        muH = np.sum(m_abund)
-        self._data[:] = np.outer(m_abund, np.ones(self.size)) / muH
+        self._data[:] = np.outer(m_abund, np.ones(self.size))
+     
+    """   
+    @property
+    def mu(self):
+        return self._mu
+
+    @property
+    def muH(self):
+        return self._muH
+        
+    @property
+    def AH(self):
+        return self._AH
+    """
 
 class SimpleMolAbund(ChemicalAbund):
     """Class that holds the abundances of molecules needed for chemistry"""
@@ -82,10 +100,12 @@ class SimpleMolAbund(ChemicalAbund):
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
                    'H2O', 'O2',
-                   'CO2', 'CO', 'CH3OH', 'CH4']
-        mol_mass = [12., 100.,
+                   'CO2', 'CO', 'CH3OH', 'CH4',
+                   'H2','He']
+        mol_mass = [76., 12.,
                     18., 32.,
-                    44., 28., 32., 16.]
+                    44., 28., 32., 16.,
+                    2., 4.]
 
         super(SimpleMolAbund, self).__init__(mol_ids, mol_mass, *sizes)
 
@@ -99,6 +119,8 @@ class SimpleMolAbund(ChemicalAbund):
                         'CO': {'C': 1, 'O': 1, },
                         'CH3OH': {'C': 1, 'O': 1, 'H': 4, },
                         'CH4': {'C': 1, 'H': 4, },
+                        'H2': {'H': 2, },
+                        'He': {'He': 1, },
                         }
 
     def atomic_abundance(self):
@@ -112,8 +134,8 @@ class SimpleMolAbund(ChemicalAbund):
                 atomic_abund[atom] += n_atom * atomic_abund.mass(atom)
 
         return atomic_abund
-
-
+        
+        
 ###############################################################################
 # Specific Chemical models
 ###############################################################################
@@ -148,34 +170,42 @@ class ChemMINDS(object):
             nmol : array(3, N) molecular mass-densities
         """
 
-        # Get total element budget
-        C = atomic_abund.number_abund('C')
-        O = atomic_abund.number_abund('O')
+        # Get total element budget - number abundances with respect to total number of atoms
+        H  = atomic_abund.number_abund('H')
+        He = atomic_abund.number_abund('He')
+        C  = atomic_abund.number_abund('C')
+        O  = atomic_abund.number_abund('O')
         Si = atomic_abund.number_abund('Si')
 
-        # Set up the number-density abundances for molecules
+        # Set up the number abundances for molecules
         mol_abund = SimpleMolAbund(atomic_abund.size)
 
         # Set the grain abundances
-        mol_abund['C-grain'] = 0.39 * C
+        mol_abund['C-grain']  = 0.39 * C
         mol_abund['Si-grain'] = Si
 
         # Assign C budget
-        mol_abund['CO2']   = 0.09 * C
-        mol_abund['CO']    = 0.50 * C
-        mol_abund['CH3OH'] = 0.01 * C
-        mol_abund['CH4']   = 0.01 * C
+        mol_abund['CO2']      = 0.09 * C
+        mol_abund['CO']       = 0.50 * C
+        mol_abund['CH3OH']    = 0.01 * C
+        mol_abund['CH4']      = 0.01 * C
         
         # Assign O budget; water is 20%, any remainder goes into O2
-        mol_abund['H2O']   = 0.20 * O
-        for spec in ['Si-grain','CO2','CO','CH3OH','CO']:
+        mol_abund['H2O']      = 0.20 * O
+        for spec in ['Si-grain','H2O','CO2','CO','CH3OH']:
             O -= mol_abund[spec]*mol_abund._n_spec[spec]['O']
-        mol_abund['O2']    = np.maximum(O / mol_abund._n_spec['O2']['O'], 0.)
+        mol_abund['O2']       = np.maximum(O / mol_abund._n_spec['O2']['O'], 0.)
+        
+        # Set the volatile abundances
+        mol_abund['He']       = He
+        for spec in ['H2O','CH3OH','CH4']:
+            H -= mol_abund[spec]*mol_abund._n_spec[spec]['H']
+        mol_abund['H2']       = np.maximum(H / mol_abund._n_spec['H2']['H'], 0.)
  
-        #  Convert to mass abundances
+        #  Convert number abundances with respect to total number of atoms to mass fractions
         for spec in mol_abund.species:
-            mol_abund[spec] *= mol_abund.mass(spec)
-
+            mol_abund[spec] *= mol_abund.mass(spec)/atomic_abund.mu()
+        
         return mol_abund
 
 ###############################################################################

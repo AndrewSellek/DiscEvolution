@@ -243,8 +243,6 @@ def setup_disc(model):
         if model['chemistry']["on"]:
             if model['chemistry']['type'] == 'krome':
                 raise NotImplementedError("Haven't configured krome chemistry in this version")
-                #disc.chem = setup_init_abund_krome(model)
-                #disc.update_ices(disc.chem.ice)
             else:
                 disc.chem = setup_init_abund_simple(model, disc)
                 disc.update_ices(disc.chem.ice)
@@ -253,8 +251,7 @@ def setup_disc(model):
 
 ###
 def setup_init_abund_simple(model, disc):
-    chemistry = get_simple_chemistry_model(model)
-
+    # Define abundances
     if model['chemistry']['type']=="Kalyaan":
         X_atom = SimpleH2OAtomAbund(model['grid']['N'])
         X_atom.set_Kalyaan_abundances()
@@ -265,9 +262,12 @@ def setup_init_abund_simple(model, disc):
         X_atom = SimpleCNOAtomAbund(model['grid']['N'])
         X_atom.set_solar_abundances()    
 
-    # Iterate as the ice fraction changes the dust-to-gas ratio
-    for i in range(10):
+    # Put into a chemical model
+    chemistry = get_simple_chemistry_model(model)
 
+    # Iterate adsorption/desorption equilibrium as the ice fraction changes the dust-to-gas ratio
+    # Note that mu also changes the disc temperature, but not worrying about this for now
+    for i in range(10):
         chem = chemistry.equilibrium_chem(disc.T,
                                           disc.midplane_gas_density,
                                           disc.dust_frac.sum(0),
@@ -276,6 +276,9 @@ def setup_init_abund_simple(model, disc):
                                           disc.Sigma_G,
                                           X_atom)
         disc.initialize_dust_density(chem.ice.total_abund)
+    print("Resulting gas phase mu: {}-{}".format(min(chem.gas.mu()),max(chem.gas.mu())))
+    print("Resulting ice phase mu: {}-{}".format(min(chem.ice.mu()),max(chem.ice.mu())))
+        
     return chem
 
 ####
@@ -400,7 +403,6 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
         if model['chemistry']['on']:
             if  model['chemistry']['type'] == 'krome':
                 raise NotImplementedError("Haven't configured krome chemistry in this version")
-                #chemistry = setup_krome_chem(model)
             else:
                 chemistry = setup_simple_chem(model)
 
