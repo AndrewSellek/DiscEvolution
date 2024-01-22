@@ -553,7 +553,7 @@ class nonThermalChem(object):
         Sa = self._f_ads * self._v_therm(T, m_mol)  * dust_frac * n
         Sd = self._f_des * self._nu_i(Tbind, m_mol) * np.exp(-Tbind/T)
         Sw = self._f_CRw * self._nu_i(Tbind, m_mol)/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-Tbind/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small
-        SX = self._f_UV * dust_frac * self._flux_XAU/R**2 * 1/X_vol
+        SX = self._f_X * dust_frac * self._flux_XAU/R**2 * 1/X_vol
         SX[(X_vol==0.0)] = 0.0
                 
         # Approximate Equilibria
@@ -595,7 +595,7 @@ class nonThermalChem(object):
         kappa_des_UV[(X_max==0.0)] = 0.0
 
         # X-ray photodesorption
-        kappa_des_X   = self._f_UV * dust_frac * self._flux_XAU/R**2 * X/X_vol
+        kappa_des_X   = self._f_X * dust_frac * self._flux_XAU/R**2 * X/X_vol
         kappa_des_X[(X_vol==0.0)] = 0.0
 
         return kappa_ads - kappa_des_th - kappa_des_CRs - kappa_des_CRw - kappa_des_UV - kappa_des_X
@@ -616,7 +616,7 @@ class nonThermalChem(object):
         kappa_des_UV[(X_max==0.0)] = 0.0
 
         # X-ray photodesorption
-        kappa_des_X   = self._f_UV * dust_frac * self._flux_XAU/R**2 * 1/X_vol
+        kappa_des_X   = self._f_X * dust_frac * self._flux_XAU/R**2 * 1/X_vol
         kappa_des_X[(X_vol==0.0)] = 0.0
 
         return kappa_ads - kappa_des_th - kappa_des_CRs - kappa_des_CRw - kappa_des_UV - kappa_des_X
