@@ -45,11 +45,12 @@ class TracerDiffusion(object):
             flux_diffuse : diffusive flux at edges (between cells only)
         """
         D = disc.nu_diff / Sc
-        Sigma_G = disc.Sigma_G
+        Sigma = disc.Sigma
+        #Sigma_G = disc.Sigma_G
 
         # Use geometric average to avoid problems at the edge of evaporating
         # regions., where Sigma_G = 0 (and eps_i is ill-defined)
-        DSig = D*Sigma_G
+        DSig = D*Sigma#_G
         DSig = np.sqrt(np.maximum(DSig[1:]*DSig[:-1], 0))
 
         return - DSig * np.diff(eps_i) / disc.grid.dRc
@@ -69,7 +70,7 @@ class TracerDiffusion(object):
 
         return (0.25 * np.diff(grid.Re)**2 / D).min()
 
-    def __call__(self, disc, eps_i, Sc=None):
+    def __call__(self, disc, eps_i, Sc=None, verbose=False):
         """Compute the rate of change of the surface density due to diffusion.
 
         args:
@@ -87,14 +88,18 @@ class TracerDiffusion(object):
         F = self._diffusive_flux(disc, eps_i, Sc)
 
         if self._limit:
-            max_f = Sigma_G*eps_i*self._eos.cs+1e-300
-            F /= 1 + abs(F)/(0.5*(max_f[1:] + max_f[:-1]))
+            max_f = Sigma*eps_i*disc._eos.cs+1e-300
+            F /= 1 + abs(F)/(0.5*(max_f[...,1:] + max_f[...,:-1]))
+        elif verbose:
+            max_f = Sigma*eps_i*disc._eos.cs+1e-300
+            max_f_av = 0.5*(max_f[...,1:] + max_f[...,:-1])
+            print(np.nanmin(abs(F)/max_f_av),np.nanmax(abs(F)/max_f_av))
 
         F *= grid.Re[1:-1]
 
         depsdt = np.zeros_like(eps_i)
-        depsdt[...,1:]  += F / grid.dRe2[1:]
-        depsdt[...,:-1] -= F / grid.dRe2[:-1]
+        depsdt[...,1:]  += F / (grid.dRe2[1:]/2)
+        depsdt[...,:-1] -= F / (grid.dRe2[:-1]/2)
 
         depsdt /= Sigma + 1e-300
         return depsdt

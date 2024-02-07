@@ -67,8 +67,10 @@ class DiscEvolutionDriver(object):
         dt = tmax - self.t
         if self._gas:
             dt = min(dt, self._gas.max_timestep(self._disc))
-        if self._dust:
             v_visc  = self._gas.viscous_velocity(disc)
+        else:
+            v_visc=None
+        if self._dust:
             dt = min(dt, self._dust.max_timestep(self._disc, v_visc))
             if self._dust._diffuse:
                 dt = min(dt, self._dust._diffuse.max_timestep(self._disc))

@@ -586,7 +586,7 @@ class SingleFluidDrift(object):
         flux = Sig_eps * dV_i[1:-1]
         return flux
         
-    def _fluxes(self, disc, eps_i, deltaV_i, St_i, dt=0):
+    def _fluxes(self, disc, eps_i, deltaV_i, St_i, dt=0, verbose=False):
         """Update a quantity that moves with the gas/dust"""
 
         Sigma = disc.Sigma
@@ -609,7 +609,7 @@ class SingleFluidDrift(object):
             Sc = Sc * (0.5625/(1 + 4*St2) + 0.4375 + 0.25*St2)
             if isinstance(St_i,np.ndarray):
                 Sc = Sc / disc._diffusive_boost
-            depsdiff = self._diffuse(disc, eps_i, Sc)
+            depsdiff = self._diffuse(disc, eps_i, Sc, verbose=verbose)
             deps += depsdiff
 
         return deps
