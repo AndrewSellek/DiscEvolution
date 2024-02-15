@@ -74,7 +74,7 @@ class DiscSnap(object):
             elif Nchem == 8:
                 self._chem = chem.MolecularIceAbund(chem.SimpleCNOMolAbund(Ndata),
                                                     chem.SimpleCNOMolAbund(Ndata))
-            elif Nchem == 10:
+            elif Nchem == 10 or Nchem == 11:
                 self._chem = chem.MolecularIceAbund(chem.SimpleMolAbund(Ndata),
                                                     chem.SimpleMolAbund(Ndata))            
             else:
