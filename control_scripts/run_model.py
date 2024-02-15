@@ -227,9 +227,9 @@ def setup_disc(model):
         # If model dust parameters not specified, resort to default
         try:
             disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field,
-                    rho_s=model['dust']['density'], Sc=model['disc']['Schmidt'], feedback=feedback, uf_ice=model['dust']['ice_frag_v'], f_grow=model['dust']['f_grow'], distribution_slope=model['dust']['p'])
+                    rho_s=model['dust']['density'], Sc=model['disc']['Schmidt'], feedback=feedback, uf_0=model['dust']['dust_frag_v'], uf_ice=model['dust']['ice_frag_v'], f_grow=model['dust']['f_grow'], distribution_slope=model['dust']['p'])
         except:
-            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field, Sc=model['disc']['Schmidt'], feedback=feedback, uf_ice=model['dust']['ice_frag_v'])
+            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field, Sc=model['disc']['Schmidt'], feedback=feedback, uf_0=model['dust']['dust_frag_v'], uf_ice=model['dust']['ice_frag_v'])
     else:
         disc = AccretionDisc(grid, star, eos, Sigma=Sigma, FUV=FUV_field)
 
