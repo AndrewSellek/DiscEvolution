@@ -100,11 +100,11 @@ class SimpleMolAbund(ChemicalAbund):
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
                    'H2O', 'O2',
-                   'CO2', 'CO', 'CH3OH', 'CH4',
+                   'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2',
                    'H2','He']
         mol_mass = [76., 12.,
                     18., 32.,
-                    44., 28., 32., 16.,
+                    44., 28., 32., 16., 26.,
                     2., 4.]
 
         super(SimpleMolAbund, self).__init__(mol_ids, mol_mass, *sizes)
@@ -119,6 +119,7 @@ class SimpleMolAbund(ChemicalAbund):
                         'CO': {'C': 1, 'O': 1, },
                         'CH3OH': {'C': 1, 'O': 1, 'H': 4, },
                         'CH4': {'C': 1, 'H': 4, },
+                        'C2H2': {'C': 2, 'H': 2, },
                         'H2': {'H': 2, },
                         'He': {'He': 1, },
                         }
@@ -159,7 +160,7 @@ class ChemMINDS(object):
         __, header = super(ChemMINDS, self).HDF5_attributes()
         return self.__class__.__name__, header
 
-    def molecular_abundance(self, T, rho, dust_frac, f_small, R, SigmaG, atomic_abund):
+    def molecular_abundance(self, T, rho, dust_frac, f_small, R, SigmaG, atomic_abund, include_C2H2=0):
         """Compute the fractions of species present given total abundances
 
         args:
@@ -180,16 +181,17 @@ class ChemMINDS(object):
         # Set up the number abundances for molecules
         mol_abund = SimpleMolAbund(atomic_abund.size)
 
-        # Set the grain abundances
-        mol_abund['C-grain']  = 0.39 * C
-        mol_abund['Si-grain'] = Si
-
         # Assign C budget
         mol_abund['CO2']      = 0.09 * C
         mol_abund['CO']       = 0.50 * C
         mol_abund['CH3OH']    = 0.01 * C
         mol_abund['CH4']      = 0.01 * C
+        mol_abund['C2H2']     = 0.01 * C * include_C2H2
         
+        # Set the grain abundances
+        mol_abund['C-grain']  = 0.39 * C - mol_abund['C2H2']
+        mol_abund['Si-grain'] = Si
+
         # Assign O budget; water is 20%, any remainder goes into O2
         mol_abund['H2O']      = 0.20 * O
         for spec in ['Si-grain','H2O','CO2','CO','CH3OH']:
@@ -198,7 +200,7 @@ class ChemMINDS(object):
         
         # Set the volatile abundances
         mol_abund['He']       = He
-        for spec in ['H2O','CH3OH','CH4']:
+        for spec in ['H2O','CH3OH','CH4','C2H2']:
             H -= mol_abund[spec]*mol_abund._n_spec[spec]['H']
         mol_abund['H2']       = np.maximum(H / mol_abund._n_spec['H2']['H'], 0.)
  
