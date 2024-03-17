@@ -80,23 +80,8 @@ class DiscEvolutionDriver(object):
             stability_no=1.0/3.0 # Fudge to make sure cell doesn't completely drain to avoid risk of overflow in the dust/abundance measurements
             Dt_min = stability_no*np.nanmin(Dt)
             dt = min(dt,Dt_min)
-            
-        # Do external photoevaporation
-        if self._external_photo:
-            if self.t>=self._external_photo._tshield:
-                self._external_photo(disc, dt)
-            if self._chemistry:
-                disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)   # Nonzero
-                disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
-                disc.chem.gas.data[:] /= np.maximum(disc.chem.gas.data.sum(0)/(1-disc.dust_frac.sum(0)), 1.0)   # Sum of gas species shouldn't exceed total gas
-                disc.chem.ice.data[:] /= np.maximum(disc.chem.ice.data.sum(0)/disc.dust_frac.sum(0), 1.0)   # Sum of dust species shouldn't exceed total dust
-                disc.chem.gas.data[:] = np.fmax(disc.chem.gas.data, 0)   # Nonzero
-                disc.chem.ice.data[:] = np.fmax(disc.chem.ice.data, 0)
 
-        # Do internal photoevaporation
-        if self._internal_photo:
-            self._internal_photo(disc, dt/yr, self._external_photo)
-        
+        ## Advection Terms            
         # Determine tracers for dust step
         gas_chem, ice_chem = None, None
         dust = None
@@ -135,6 +120,7 @@ class DiscEvolutionDriver(object):
             if dust is not None:
                 dust[:] += dt * self._diffusion(disc, dust)
 
+        ## Conversion terms
         # Chemistry
         if self._chemistry:
             rho = disc.midplane_gas_density
@@ -150,12 +136,6 @@ class DiscEvolutionDriver(object):
             # Clean values
             disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)   # Nonzero
             disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
-            """
-            disc.chem.gas.data[:] /= np.maximum(disc.chem.gas.data.sum(0)/(1-disc.dust_frac.sum(0)), 1.0)   # Sum of gas species shouldn't exceed total gas
-            disc.chem.ice.data[:] /= np.maximum(disc.chem.ice.data.sum(0)/disc.dust_frac.sum(0), 1.0)   # Sum of dust species shouldn't exceed total dust
-            disc.chem.gas.data[:] = np.fmax(disc.chem.gas.data, 0)   # Nonzero
-            disc.chem.ice.data[:] = np.fmax(disc.chem.ice.data, 0)
-            """
 
             # If we have dust, we should update it now the ice fraction has changed
             disc.update_ices(disc.chem.ice)            
@@ -169,6 +149,34 @@ class DiscEvolutionDriver(object):
             pass
 
         # Now we should update the auxillary properties, do grain growth etc
+        disc.update(dt)
+        
+        ## Sink Terms
+        # Do external photoevaporation
+        if self._external_photo:
+            if self.t>=self._external_photo._tshield:
+                self._external_photo(disc, dt)
+
+        # Do internal photoevaporation
+        if self._internal_photo:
+            self._internal_photo(disc, dt/yr, self._external_photo)
+            
+        # Repin
+        disc.Sigma[:] = np.maximum(disc.Sigma, 0)        
+        try:
+            disc.dust_frac[:] = np.maximum(disc.dust_frac, 0)
+            disc.dust_frac[:] /= np.maximum(disc.dust_frac.sum(0), 1.0)
+        except AttributeError:
+            pass
+        if self._chemistry:
+            disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)   # Nonzero
+            disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
+            disc.chem.gas.data[:] /= np.maximum(disc.chem.gas.data.sum(0)/(1-disc.dust_frac.sum(0)), 1.0)   # Sum of gas species shouldn't exceed total gas
+            disc.chem.ice.data[:] /= np.maximum(disc.chem.ice.data.sum(0)/disc.dust_frac.sum(0), 1.0)   # Sum of dust species shouldn't exceed total dust
+            disc.chem.gas.data[:] = np.fmax(disc.chem.gas.data, 0)   # Nonzero
+            disc.chem.ice.data[:] = np.fmax(disc.chem.ice.data, 0)
+
+        # Reupdate dust
         disc.update(dt)
 
         self._t += dt
