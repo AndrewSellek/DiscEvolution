@@ -80,6 +80,22 @@ class DiscEvolutionDriver(object):
             stability_no=1.0/3.0 # Fudge to make sure cell doesn't completely drain to avoid risk of overflow in the dust/abundance measurements
             Dt_min = stability_no*np.nanmin(Dt)
             dt = min(dt,Dt_min)
+            
+        # Do external photoevaporation
+        if self._external_photo:
+            if self.t>=self._external_photo._tshield:
+                self._external_photo(disc, dt)
+            if self._chemistry:
+                disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)   # Nonzero
+                disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
+                disc.chem.gas.data[:] /= np.maximum(disc.chem.gas.data.sum(0)/(1-disc.dust_frac.sum(0)), 1.0)   # Sum of gas species shouldn't exceed total gas
+                disc.chem.ice.data[:] /= np.maximum(disc.chem.ice.data.sum(0)/disc.dust_frac.sum(0), 1.0)   # Sum of dust species shouldn't exceed total dust
+                disc.chem.gas.data[:] = np.fmax(disc.chem.gas.data, 0)   # Nonzero
+                disc.chem.ice.data[:] = np.fmax(disc.chem.ice.data, 0)
+
+        # Do internal photoevaporation
+        if self._internal_photo:
+            self._internal_photo(disc, dt/yr, self._external_photo)
         
         # Determine tracers for dust step
         gas_chem, ice_chem = None, None
@@ -118,15 +134,6 @@ class DiscEvolutionDriver(object):
                 ice_chem[:] += dt * self._diffusion(disc, ice_chem)
             if dust is not None:
                 dust[:] += dt * self._diffusion(disc, dust)
-
-        # Do external photoevaporation
-        if self._external_photo:
-            if self.t>=self._external_photo._tshield:
-                self._external_photo(disc, dt)
-
-        # Do internal photoevaporation
-        if self._internal_photo:
-            self._internal_photo(disc, dt/yr, self._external_photo)
 
         # Chemistry
         if self._chemistry:
