@@ -252,7 +252,7 @@ class TanhAlphaEOS(LocallyIsothermalEOS):
         self._t_trap = t_trap
 
     def _f_nu(self, R, t=0):
-        # Return Sigma divided by pertubation - only used in initial conditions
+        # Returns diffusive and total effective viscosities
         return self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R), self._f_alpha(R, t=t) * self._f_cs(R) * self._f_H(R) * self._ptbn(R, t=t)
 
     def _f_alpha(self, R, t=0):

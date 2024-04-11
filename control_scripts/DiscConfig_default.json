@@ -67,7 +67,9 @@
 "dust_frag_v" : 100,
 "p" : 3.5,
 "density" : 1.0,
-"f_grow" : 1.0
+"f_grow" : 1.0,
+"alpha_t" : 1e-3,
+"alpha_z" : 1e-3
 },
 
 "x-ray" : {

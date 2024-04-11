@@ -26,7 +26,7 @@ class DustyDisc(AccretionDisc):
         feedback : When False, the dust mass is considered to be a negligible
                    fraction of the total mass.
     """
-    def __init__(self, grid, star, eos, Sigma=None, FUV=0.0, rho_s=1., Sc=1., feedback=True):
+    def __init__(self, grid, star, eos, Sigma=None, FUV=0.0, rho_s=1., Sc=1., feedback=True, alpha_t = None, alpha_z = None):
 
         super(DustyDisc, self).__init__(grid, star, eos, Sigma=Sigma, FUV=FUV)
 
@@ -35,6 +35,11 @@ class DustyDisc(AccretionDisc):
 
         self._Sc = Sc
         self._feedback = feedback
+                
+        # Turbulence factors
+        self._alpha_t = alpha_t
+        self._alpha_z = alpha_z
+        self._alpha_r = None    # not used
 
     def Stokes(self, Sigma=None, size=None):
         """Stokes number of the particle"""
@@ -104,7 +109,10 @@ class DustyDisc(AccretionDisc):
         """Dust scale height"""
 
         St = self.Stokes()
-        a  = self.alpha/self.Sc
+        if self._alpha_z:
+            a  = self._alpha_z/self.Sc
+        else:
+            a  = self.alpha/self.Sc
         eta = 1 - 1. / (2 + 1./St)
 
         return self.H * np.sqrt(eta * a / (a + St))
@@ -227,8 +235,8 @@ class DustGrowthTwoPop(DustyDisc):
     """
     def __init__(self, grid, star, eos, eps, Sigma=None, FUV=0.0,
                  rho_s=1., Sc=1., uf_0=100., uf_ice=1e3, f_ice=1, thresh=0.1,
-                 f_grow=1.0, a0=1e-5, amin=1e-5, f_drift=0.55, f_frag=0.37, feedback=True, start_small=True, distribution_slope=3.5):
-        super(DustGrowthTwoPop, self).__init__(grid, star, eos, Sigma=Sigma, FUV=FUV, rho_s=rho_s, Sc=Sc, feedback=feedback)
+                 f_grow=1.0, a0=1e-5, amin=1e-5, f_drift=0.55, f_frag=0.37, feedback=True, start_small=True, distribution_slope=3.5, alpha_t=None, alpha_z=None):
+        super(DustGrowthTwoPop, self).__init__(grid, star, eos, Sigma=Sigma, FUV=FUV, rho_s=rho_s, Sc=Sc, feedback=feedback, alpha_t=alpha_t, alpha_z=alpha_z)
         
         self._uf_0   = uf_0 / (AU * Omega0)
         self._uf_ice = uf_ice / (AU * Omega0)
@@ -288,7 +296,10 @@ class DustGrowthTwoPop(DustyDisc):
         
     def _frag_limit(self):
         """Maximum particle size before fragmentation kicks in"""
-        alpha = self.alpha/self.Sc
+        if self._alpha_t:
+            alpha = self._alpha_t/self.Sc
+        else:
+            alpha = self.alpha/self.Sc
         af = (self.Sigma_G/(self._rho_s*alpha)) * (self._uf/self.cs)**2
         return self._ffrag * af
 
@@ -298,7 +309,10 @@ class DustGrowthTwoPop(DustyDisc):
         if eps_tot is None:
             eps_tot = self.dust_frac.sum(0)
 
-        alpha = self.alpha/self.Sc
+        if self._alpha_t:
+            alpha = self._alpha_t/self.Sc
+        else:
+            alpha = self.alpha/self.Sc
 
         a0  = 8 * self.Sigma / (np.pi * self._rho_s) * self.Re**-0.25
         a0 *= np.sqrt(self.mu*m_H/(self._rho_s*alpha)) / (2*np.pi)
