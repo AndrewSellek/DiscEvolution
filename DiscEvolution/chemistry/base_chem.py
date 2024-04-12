@@ -353,13 +353,24 @@ class ThermalChem(object):
         # Adsorption & desorption rate per molecule
         Sa = self._f_ads * self._v_therm(T, m_mol)  * dust_frac * n
         Sd = self._f_des * self._nu_i(Tbind, m_mol) * np.exp(-Tbind/T) 
-
+        Sa = np.maximum(Sa, 0)
+        Sd = np.maximum(Sd, 0)
+    
         X_max = self._etaNbind * dust_frac
         
         X_eq = X_t - np.minimum(X_t   * Sd/(Sa + Sd + 1e-300),
                                 X_max * Sd/(Sa + 1e-300))
 
-        return X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
+        X_out =  X_eq * m_mol / mu * (dust_frac>0)    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
+        """
+        if np.sum(X_out==np.inf):
+            where_inf = (X_out==np.inf)
+            print(spec, np.argwhere(where_inf), R[where_inf])
+            print(rho[where_inf], dust_frac[where_inf])
+            print(Sa[where_inf], Sd[where_inf])
+            print(X_t[where_inf], X_max[where_inf], X_eq[where_inf])
+        """
+        return X_out
     
     def _update_ice_balance(self, dt, T, rho, dust_frac, spec, abund):
 
@@ -555,6 +566,10 @@ class nonThermalChem(object):
         Sw = self._f_CRw * self._nu_i(Tbind, m_mol)/self._nu_i(self._Tbind['CO'], self._m_mol['CO']) * np.exp(-Tbind/self._Tmax)/np.exp(-self._Tbind['CO']/self._Tmax) * f_small
         SX = self._f_X * dust_frac * self._flux_XAU/R**2 * 1/X_vol
         SX[(X_vol==0.0)] = 0.0
+        Sa = np.maximum(Sa, 0)
+        Sd = np.maximum(Sd, 0)
+        Sw = np.maximum(Sw, 0)
+        SX = np.maximum(SX, 0)
                 
         # Approximate Equilibria
         X_eq_th  = np.maximum(X_t * Sa/(Sa + Sd + 1e-300), X_t - X_max * Sd/(Sa + 1e-300))
@@ -575,7 +590,16 @@ class nonThermalChem(object):
             X_eq[(dust_frac==0.0)] = 0.0    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
             nLoop += 1
 
-        return X_eq * m_mol / mu
+        X_out = X_eq * m_mol / mu
+        """
+        if np.sum(X_out==np.inf):
+            where_inf = (X_out==np.inf)
+            print(spec, np.argwhere(where_inf), R[where_inf])
+            print(rho[where_inf], dust_frac[where_inf])
+            print(Sa[where_inf], Sd[where_inf], Sw[where_inf], SX[where_inf])
+            print(X_t[where_inf], X_max[where_inf], X_eq[where_inf])
+        """
+        return X_out
         
     def _net_adsorption(self, X, X_t, T, n, dust_frac, f_small, AV, R, spec, X_max, X_vol):
 
