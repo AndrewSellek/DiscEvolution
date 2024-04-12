@@ -10,10 +10,14 @@ from .base_chem import ChemicalAbund
 
 from .CO_chem  import SimpleCOMolAbund, SimpleCOAtomAbund
 from .CNO_chem import SimpleCNOAtomAbund, SimpleCNOMolAbund
+from .H2O_chem import SimpleH2OAtomAbund, SimpleH2OMolAbund
+from .MINDS_chem import SimpleAtomAbund, SimpleMolAbund
 
 _derived_abundance_types = ( 
     SimpleCOMolAbund, SimpleCOAtomAbund,
     SimpleCNOAtomAbund, SimpleCNOMolAbund, 
+    SimpleH2OAtomAbund, SimpleH2OMolAbund, 
+    SimpleAtomAbund, SimpleMolAbund, 
 )
 
 
