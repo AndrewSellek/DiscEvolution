@@ -11,8 +11,8 @@ from .CNO_chem import EquilibriumCNOChemMadhu
 from .H2O_chem import SimpleH2OAtomAbund, SimpleH2OMolAbund
 from .H2O_chem import EquilibriumH2OChemKalyaan
 
-from .MINDS_chem import SimpleAtomAbund, SimpleMolAbund
-from .MINDS_chem import EquilibriumChemMINDS, TimeDepChemMINDS
+from .Extended_chem import SimpleAtomAbund, SimpleMolAbund
+from .Extended_chem import EquilibriumChemExtended, TimeDepChemExtended
 
 from .atomic_data import molecular_mass, atomic_abundances, atomic_composition
 

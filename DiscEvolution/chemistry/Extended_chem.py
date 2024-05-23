@@ -139,7 +139,7 @@ class SimpleMolAbund(ChemicalAbund):
 ###############################################################################
 # Specific Chemical models
 ###############################################################################
-class ChemMINDS(object):
+class ChemExtended(object):
     """Chemical ratios from Sellek+ (in prep.)
 
     args:
@@ -151,12 +151,12 @@ class ChemMINDS(object):
     """
 
     def ASCII_header(self):
-        """MINDS chem header"""
-        return (super(ChemMINDS, self).ASCII_header())
+        """Extended chem header"""
+        return (super(ChemExtended, self).ASCII_header())
 
     def HDF5_attributes(self):
         """Class information for HDF5 headers"""
-        __, header = super(ChemMINDS, self).HDF5_attributes()
+        __, header = super(ChemExtended, self).HDF5_attributes()
         return self.__class__.__name__, header
 
     def molecular_abundance(self, T, rho, dust_frac, f_small, R, SigmaG, atomic_abund):
@@ -211,15 +211,15 @@ class ChemMINDS(object):
 ###############################################################################
 # Combined Models
 ###############################################################################
-class EquilibriumChemMINDS(ChemMINDS, EquilibriumChem):
+class EquilibriumChemExtended(ChemExtended, EquilibriumChem):
     def __init__(self, fix_ratios=True, **kwargs):
-        assert fix_ratios,"For MINDS chem, no option to reset implemented, cannot run a model with fix_ratios=False"
+        assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
-class TimeDepChemMINDS(ChemMINDS, TimeDependentChem):
+class TimeDepChemExtended(ChemExtended, TimeDependentChem):
     def __init__(self, fNH3=None, **kwargs):
         raise NotImplementedError
-        ChemMINDS.__init__(self, fNH3)
+        ChemExtended.__init__(self, fNH3)
         TimeDependentChem.__init__(self, **kwargs)
 
 ###############################################################################
@@ -264,8 +264,8 @@ if __name__ == "__main__":
     T = eos.T
     n = rho / (2.4 * m_H)
 
-    EQ_chem = SimpleChemMINDS()
-    TD_chem = TimeDepChemMINDS(a=1e-5)
+    EQ_chem = SimpleChemExtended()
+    TD_chem = TimeDepChemExtended(a=1e-5)
 
     X_solar = SimpleAtomAbund(n.shape[0])
     X_solar.set_solar_abundances()
@@ -289,8 +289,8 @@ if __name__ == "__main__":
     plt.ylabel(r'$[X/H]\,(\times 10^4)$')
 
     plt.subplot(212)
-    S_chem = SimpleChemMINDS()
-    EQ_chem = EquilibriumChemMINDS()
+    S_chem = SimpleChemExtended()
+    EQ_chem = EquilibriumChemExtended()
 
     S_mol = S_chem.equilibrium_chem(T, rho, d2g, X_solar)
     EQ_mol = EQ_chem.equilibrium_chem(T, rho, d2g, X_solar)
