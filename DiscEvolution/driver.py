@@ -82,6 +82,8 @@ class DiscEvolutionDriver(object):
             stability_no=1.0/3.0 # Fudge to make sure cell doesn't completely drain to avoid risk of overflow in the dust/abundance measurements
             Dt_min = stability_no*np.nanmin(Dt)
             dt = min(dt,Dt_min)
+        if self._chemistry and hasattr(self._chemistry, 'max_timestep'):
+            dt = min(dt, self._chemistry.max_timestep(self._disc))
         
         # Determine tracers for dust step
         gas_chem, ice_chem = None, None

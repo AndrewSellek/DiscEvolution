@@ -312,6 +312,12 @@ def get_simple_chemistry_model(model):
         nonThermal = True
         nonThermal_dict['X_desorb']     = model['chemistry']['X_desorb']
         nonThermal_dict['Mstar']        = model['star']['mass']
+      
+    # Reactions  
+    if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
+        ratesFile = model['chemistry']['ratesFile']
+    else:
+        ratesFile = None
     
     if chem_type == 'TimeDep':
         chemistry = TimeDepCNOChemOberg(a=grain_size)
@@ -326,7 +332,7 @@ def get_simple_chemistry_model(model):
     elif chem_type == 'MINDS' or chem_type == 'Extended':
         chemistry = EquilibriumChemExtended(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'C2H2form':
-        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile)
     else:
         raise ValueError("Unknown chemical model type")
 

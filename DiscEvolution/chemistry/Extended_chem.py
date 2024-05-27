@@ -5,9 +5,6 @@ from ..constants import *
 from .base_chem import ChemicalAbund, MolecularIceAbund
 from .base_chem import TimeDependentChem, EquilibriumChem
 
-def Rate13format(T, alpha, beta, gamma):
-    return alpha * (T/300)**beta * np.exp(-gamma/T)
-
 ################################################################################
 # Simple Chemistry wrappers
 ################################################################################
@@ -153,12 +150,28 @@ class ChemExtended(object):
         fix_NH3    : Whether to fix the nitrogen abundance when recomputing the
                      molecular abundances
     """
-    def __init__(self):
+    def __init__(self, ratesFile=None, zetaCR=1.36e-17):
         """Initialisation of reactions""" 
-        self._gas_reactions = ['CH4 -> 0.5 * C2H2 + 1.5 * H2'] #'CH4 + CH4 -> C2H2 + H2 + H2 + H2']
-        self._gas_rates     = [(1e-14,0,0)] #[(1e-12, 2.5, 100.0)]
+        self._zetaCR = zetaCR
+        self._gas_reactions = []
+        self._gas_rates     = []
         self._ice_reactions = []
         self._ice_rates     = []
+
+        if ratesFile is not None:
+            for row in open(ratesFile):
+                if row[0]=='#':
+                    continue
+                reaction, alpha, beta, gamma = row.replace("\n","").split("\t")
+                if "(s)" in reaction:
+                    self._ice_reactions.append(reaction)
+                    self._ice_rates.append((float(alpha),float(beta),float(gamma)))
+                else:
+                    self._gas_reactions.append(reaction)
+                    self._gas_rates.append((float(alpha),float(beta),float(gamma)))
+                    
+        self._Nreacts = len(self._gas_reactions+self._ice_reactions)
+        print("Included {} reactions:\n".format(self._Nreacts), '\n'.join(self._gas_reactions))
 
     def ASCII_header(self):
         """Extended chem header"""
@@ -168,6 +181,12 @@ class ChemExtended(object):
         """Class information for HDF5 headers"""
         __, header = super(ChemExtended, self).HDF5_attributes()
         return self.__class__.__name__, header
+        
+    def UMISTformat(self, T, alpha, beta, gamma):
+        return alpha * (T/300)**beta * np.exp(-gamma/T)
+
+    def UMISTformat_CR(self, T, alpha, beta, gamma):
+        return alpha * (T/300)**beta * gamma * self._zetaCR/1.36e-17
 
     def initial_molecular_abundance(self, atomic_abund):
         """Compute the initial fractions of species present given total abundances
@@ -233,6 +252,32 @@ class ChemExtended(object):
             nmol : array(3, N) molecular mass-densities
         """
 
+        for react, rate in zip(self._ice_reactions,self._ice_rates):
+            reactants, products = react.replace(' ','').split('->')
+            reactants = reactants.split('+')
+            weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
+            reactants = [reactant.split('*')[-1] for reactant in reactants]
+            products  = products.split('+')
+            weights_p = [float(product.split('*')[0]) if '*' in product else 1.0 for product in products]
+            products  = [product.split('*')[-1] for product in products]
+            
+            if 'CR' in reactants:
+                krate = self.UMISTformat_CR(T, *rate)
+                reactants.remove('CR')
+            else:
+                krate = self.UMISTformat(T, *rate)
+            if len(reactants)==2:            
+                norm_rate = rho/m_H * (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * (ice_abund[reactants[1]]/ice_abund.mass(reactants[1])) * krate/Omega0
+            elif len(reactants)==1:
+                norm_rate = (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * krate/Omega0
+            else:
+                raise NotImplementedError
+                            
+            for r, w in zip(reactants, weights_r):
+                ice_abund[r] -= ice_abund.mass(r) * norm_rate * w * dt
+            for p, w in zip(products, weights_p):
+                ice_abund[p] += ice_abund.mass(p) * norm_rate * w * dt
+                
         for react, rate in zip(self._gas_reactions,self._gas_rates):
             reactants, products = react.replace(' ','').split('->')
             reactants = reactants.split('+')
@@ -242,39 +287,94 @@ class ChemExtended(object):
             weights_p = [float(product.split('*')[0]) if '*' in product else 1.0 for product in products]
             products  = [product.split('*')[-1] for product in products]
             
+            if 'CR' in reactants:
+                krate = self.UMISTformat_CR(T, *rate)
+                reactants.remove('CR')
+            else:
+                krate = self.UMISTformat(T, *rate)
             if len(reactants)==2:            
-                norm_rate = rho/m_H * (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * (gas_abund[reactants[1]]/gas_abund.mass(reactants[1])) * Rate13format(T, *rate) * dt/Omega0
+                norm_rate = rho/m_H * (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * (gas_abund[reactants[1]]/gas_abund.mass(reactants[1])) * krate/Omega0
             elif len(reactants)==1:
-                norm_rate = (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * Rate13format(T, *rate) * dt/Omega0
+                norm_rate = (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * krate/Omega0
             else:
                 raise NotImplementedError
                 
             for r, w in zip(reactants, weights_r):
-                gas_abund[r] -= gas_abund.mass(r) * norm_rate * w
+                gas_abund[r] -= gas_abund.mass(r) * norm_rate * w * dt
             for p, w in zip(products, weights_p):
-                gas_abund[p] += gas_abund.mass(p) * norm_rate * w
+                gas_abund[p] += gas_abund.mass(p) * norm_rate * w * dt
+
+        return ice_abund, gas_abund
+        
+    def max_timestep(self, disc):
+        """Compute the maximum timestep that does not completely deplete a reactant
+
+        args:
+             disc         : disc object
+
+        returns:
+            dt : timestep (default=infinity if no reactions)
+        """
+        dt = np.inf
+        if self._Nreacts==0:
+            return dt
+        
+        T = disc.T
+        rho = disc.midplane_gas_density
+        ice_abund = disc.chem.ice
+        gas_abund = disc.chem.gas
         
         for react, rate in zip(self._ice_reactions,self._ice_rates):
             reactants, products = react.replace(' ','').split('->')
             reactants = reactants.split('+')
-            products  = products.split('+')
+            weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
+            reactants = [reactant.split('*')[-1] for reactant in reactants]
             
-            norm_rate = rho/m_H * (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * (ice_abund[reactants[1]]/ice_abund.mass(reactants[1])) * Rate13format(T, *rate) * dt/Omega0
+            if 'CR' in reactants:
+                krate = self.UMISTformat_CR(T, *rate)
+                reactants.remove('CR')
+            else:
+                krate = self.UMISTformat(T, *rate)
+            if len(reactants)==2:            
+                norm_rate = rho/m_H * (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * (ice_abund[reactants[1]]/ice_abund.mass(reactants[1])) * krate/Omega0
+            elif len(reactants)==1:
+                norm_rate = (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * krate/Omega0
+            else:
+                raise NotImplementedError
+                            
+            for r, w in zip(reactants, weights_r):
+                dt = min(dt, np.nanmin(ice_abund[r]/(ice_abund.mass(r) * norm_rate * w)))
+                
+        for react, rate in zip(self._gas_reactions,self._gas_rates):
+            reactants, products = react.replace(' ','').split('->')
+            reactants = reactants.split('+')
+            weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
+            reactants = [reactant.split('*')[-1] for reactant in reactants]
             
-            for r in reactants:
-                ice_abund[r] -= ice_abund.mass(r) * norm_rate
-            for p in products:
-                ice_abund[p] += ice_abund.mass(p) * norm_rate
-
-        return ice_abund, gas_abund
-
+            if 'CR' in reactants:
+                krate = self.UMISTformat_CR(T, *rate)
+                reactants.remove('CR')
+            else:
+                krate = self.UMISTformat(T, *rate)
+            if len(reactants)==2:            
+                norm_rate = rho/m_H * (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * (gas_abund[reactants[1]]/gas_abund.mass(reactants[1])) * krate/Omega0
+            elif len(reactants)==1:
+                norm_rate = (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * krate/Omega0
+            else:
+                raise NotImplementedError
+                
+            for r, w in zip(reactants, weights_r):
+                dt = min(dt, np.nanmin(gas_abund[r]/(gas_abund.mass(r) * norm_rate * w)))
+                
+        return dt
+        
 ###############################################################################
 # Combined Models
 ###############################################################################
 class EquilibriumChemExtended(ChemExtended, EquilibriumChem):
-    def __init__(self, fix_ratios=True, **kwargs):
+    def __init__(self, fix_ratios=True, ratesFile=None, **kwargs):
         #assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
-        ChemExtended.__init__(self)
+        ChemExtended.__init__(self, ratesFile)
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
 class TimeDepChemExtended(ChemExtended, TimeDependentChem):
