@@ -200,7 +200,7 @@ class SimpleChemBase(object):
         """Compute the equilibrium chemistry
         Used only to calculate an initial condition"""
 
-        ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, atomic_abund=abund)
+        ice = self.initial_molecular_abundance(abund)
         gas = ice.copy()
         self._mu = ice.mu()
         
@@ -213,20 +213,9 @@ class SimpleChemBase(object):
 
 
     def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, **kwargs):
-
-        if not self._fix_ratios:
-            # Resetting to equilibrium ratios
-            mol_abund  = chem.gas.copy()
-            mol_abund += chem.ice
-
-            chem.ice = self.molecular_abundance(T, rho, dust_frac, f_small, R, SigmaG, 
-                                                mol_abund=mol_abund)
-            chem.gas.data[:] = 0
-        else:
-            # Advection only
-            chem.ice += chem.gas
-            chem.gas.data[:] = 0
-
+        # Reportion gas and ice after drift
+        chem.ice += chem.gas
+        chem.gas.data[:] = 0
         self._mu = chem.ice.mu()
         for spec in chem.ice.species:
             mtot = chem.ice[spec] + chem.gas[spec]
@@ -235,6 +224,22 @@ class SimpleChemBase(object):
                                               spec, chem.ice, use_HH=False)
             chem.ice[spec] = ice
             chem.gas[spec] = np.maximum(mtot - ice, 0)
+
+        if not self._fix_ratios:
+            # Allow some chemical reactions
+            chem.ice, chem.gas = self.convert_molecular_abundance(T, rho, chem.ice, chem.gas, dt)
+    
+            # Redo freeze-out with new abundances
+            chem.ice += chem.gas
+            chem.gas.data[:] = 0
+            self._mu = chem.ice.mu()
+            for spec in chem.ice.species:
+                mtot = chem.ice[spec] + chem.gas[spec]
+
+                ice = self._equilibrium_ice_abund(T, rho,  dust_frac, f_small, R, SigmaG,
+                                                  spec, chem.ice, use_HH=False)
+                chem.ice[spec] = ice
+                chem.gas[spec] = np.maximum(mtot - ice, 0)
 
 
 class ThermalChem(object):
@@ -257,18 +262,19 @@ class ThermalChem(object):
         ## graphite == Graphite/HOPG; Table 3
         # Pure binding energies taken where possible from same sources:
         ## H2O: Smith et al. 2011, Table 2 (crystalline H2O)
-        ## CO2: Eldridge et al. 2013; Table 1 (pure, multilayer)
+        ## CO2: Edridge et al. 2013; Table 1 (pure, multilayer)
         ## CH3OH: Doronin et al. 2015; Fig 3b
         ## CO, O2, CH4: Smith et al. 2016; Table 1 (multilayer)
+        ## C2H2: Behmard et al. 2019; Table 2 (pure, multilayer)
         self._Tbind =  {'c-ASW':    {'H2O' : 5705., 'O2' : 1107., 'CO2' : 3196., 'CO' : 1390., 'CH3OH' : 6621., 'CH4': 1232.},
                         'silicate': {'H2O' : 5755., 'O2' : 1385., 'CO2' : 3738., 'CO' : 1365., 'CH3OH' : np.nan, 'CH4': np.nan},
                         'graphite': {'H2O' : 5792., 'O2' : 1522., 'CO2' : 3243., 'CO' : 1631., 'CH3OH' : 5728., 'CH4': 1593.},
-                        'pure':     {'H2O' : 6722., 'O2' : 1030., 'CO2' : 2980., 'CO' :  910., 'CH3OH' : 4850., 'CH4': 1190.}}
+                        'pure':     {'H2O' : 6722., 'O2' : 1030., 'CO2' : 2980., 'CO' :  910., 'CH3OH' : 4850., 'CH4': 1190., 'C2H2': 2800}}
                        
         self._nu_pre = {'c-ASW':    {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 6.81e16, 'CO' : 9.14e14, 'CH3OH' : 3.18e17, 'CH4': 5.43e13},
                         'silicate': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
                         'graphite': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
-                        'pure':     {'H2O' : 1.3e18,  'O2' : 1.3e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14}}
+                        'pure':     {'H2O' : 1.3e18,  'O2' : 1.3e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14, 'C2H2': 3e16}}
                         
         # Number of dust grains per hydrogen nucleus, eta:
         m_g = 4*np.pi * rho_s * a**3 / 3

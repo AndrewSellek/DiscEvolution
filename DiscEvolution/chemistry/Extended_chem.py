@@ -5,6 +5,9 @@ from ..constants import *
 from .base_chem import ChemicalAbund, MolecularIceAbund
 from .base_chem import TimeDependentChem, EquilibriumChem
 
+def Rate13format(T, alpha, beta, gamma):
+    return alpha * (T/300)**beta * np.exp(-gamma/T)
+
 ################################################################################
 # Simple Chemistry wrappers
 ################################################################################
@@ -100,11 +103,11 @@ class SimpleMolAbund(ChemicalAbund):
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
                    'H2O', 'O2',
-                   'CO2', 'CO', 'CH3OH', 'CH4',
+                   'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2',
                    'H2','He']
         mol_mass = [76., 12.,
                     18., 32.,
-                    44., 28., 32., 16.,
+                    44., 28., 32., 16., 26.,
                     2., 4.]
 
         super(SimpleMolAbund, self).__init__(mol_ids, mol_mass, *sizes)
@@ -119,6 +122,7 @@ class SimpleMolAbund(ChemicalAbund):
                         'CO': {'C': 1, 'O': 1, },
                         'CH3OH': {'C': 1, 'O': 1, 'H': 4, },
                         'CH4': {'C': 1, 'H': 4, },
+                        'C2H2': {'C': 2, 'H': 2, },
                         'H2': {'H': 2, },
                         'He': {'He': 1, },
                         }
@@ -149,6 +153,12 @@ class ChemExtended(object):
         fix_NH3    : Whether to fix the nitrogen abundance when recomputing the
                      molecular abundances
     """
+    def __init__(self):
+        """Initialisation of reactions""" 
+        self._gas_reactions = ['CH4 -> 0.5 * C2H2 + 1.5 * H2'] #'CH4 + CH4 -> C2H2 + H2 + H2 + H2']
+        self._gas_rates     = [(1e-14,0,0)] #[(1e-12, 2.5, 100.0)]
+        self._ice_reactions = []
+        self._ice_rates     = []
 
     def ASCII_header(self):
         """Extended chem header"""
@@ -159,11 +169,10 @@ class ChemExtended(object):
         __, header = super(ChemExtended, self).HDF5_attributes()
         return self.__class__.__name__, header
 
-    def molecular_abundance(self, T, rho, dust_frac, f_small, R, SigmaG, atomic_abund):
-        """Compute the fractions of species present given total abundances
+    def initial_molecular_abundance(self, atomic_abund):
+        """Compute the initial fractions of species present given total abundances
 
         args:
-             T            : array(N)   temperature (K)
              atomic_abund : atomic abundaces, SimpleAtomAbund object
 
         returns:
@@ -189,6 +198,7 @@ class ChemExtended(object):
         mol_abund['CO']       = 0.50 * C
         mol_abund['CH3OH']    = 0.01 * C
         mol_abund['CH4']      = 0.01 * C
+        mol_abund['C2H2']     = 0.00 * C
         
         # Assign O budget; water is 20%, any remainder goes into O2
         mol_abund['H2O']      = 0.20 * O
@@ -205,21 +215,72 @@ class ChemExtended(object):
         #  Convert number abundances with respect to total number of atoms to mass fractions
         for spec in mol_abund.species:
             mol_abund[spec] *= mol_abund.mass(spec)/atomic_abund.mu()
+            
+        print(np.shape(mol_abund))
         
         return mol_abund
+        
+    def convert_molecular_abundance(self, T, rho, ice_abund, gas_abund, dt):
+        """Compute the fractions of species present given total abundances
+
+        args:
+             T            : array(N)   temperature (K)
+             rho          : array(N)   gas density (g/cm^3)
+             ice_abund    : SimpleMolAbund object: ice abundances
+             gas_abund    : SimpleMolAbund object: gas abundances
+
+        returns:
+            nmol : array(3, N) molecular mass-densities
+        """
+
+        for react, rate in zip(self._gas_reactions,self._gas_rates):
+            reactants, products = react.replace(' ','').split('->')
+            reactants = reactants.split('+')
+            weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
+            reactants = [reactant.split('*')[-1] for reactant in reactants]
+            products  = products.split('+')
+            weights_p = [float(product.split('*')[0]) if '*' in product else 1.0 for product in products]
+            products  = [product.split('*')[-1] for product in products]
+            
+            if len(reactants)==2:            
+                norm_rate = rho/m_H * (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * (gas_abund[reactants[1]]/gas_abund.mass(reactants[1])) * Rate13format(T, *rate) * dt/Omega0
+            elif len(reactants)==1:
+                norm_rate = (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * Rate13format(T, *rate) * dt/Omega0
+            else:
+                raise NotImplementedError
+                
+            for r, w in zip(reactants, weights_r):
+                gas_abund[r] -= gas_abund.mass(r) * norm_rate * w
+            for p, w in zip(products, weights_p):
+                gas_abund[p] += gas_abund.mass(p) * norm_rate * w
+        
+        for react, rate in zip(self._ice_reactions,self._ice_rates):
+            reactants, products = react.replace(' ','').split('->')
+            reactants = reactants.split('+')
+            products  = products.split('+')
+            
+            norm_rate = rho/m_H * (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * (ice_abund[reactants[1]]/ice_abund.mass(reactants[1])) * Rate13format(T, *rate) * dt/Omega0
+            
+            for r in reactants:
+                ice_abund[r] -= ice_abund.mass(r) * norm_rate
+            for p in products:
+                ice_abund[p] += ice_abund.mass(p) * norm_rate
+
+        return ice_abund, gas_abund
 
 ###############################################################################
 # Combined Models
 ###############################################################################
 class EquilibriumChemExtended(ChemExtended, EquilibriumChem):
     def __init__(self, fix_ratios=True, **kwargs):
-        assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
+        #assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
+        ChemExtended.__init__(self)
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
 class TimeDepChemExtended(ChemExtended, TimeDependentChem):
-    def __init__(self, fNH3=None, **kwargs):
+    def __init__(self, **kwargs):
         raise NotImplementedError
-        ChemExtended.__init__(self, fNH3)
+        ChemExtended.__init__(self)
         TimeDependentChem.__init__(self, **kwargs)
 
 ###############################################################################

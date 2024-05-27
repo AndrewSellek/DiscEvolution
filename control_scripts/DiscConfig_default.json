@@ -91,9 +91,10 @@
 
 "perturbation" : {
 "Type"   : "None",
-"Amplitude" : 10.0,
-"Radius" : 5.0,
-"Width"  : 1.0,
+"Amplitude" : 0.0,
+"Radius" : 0.0,
+"Width"  : 0.0,
 "Initial" : false
+}
 
 }

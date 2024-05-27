@@ -259,7 +259,7 @@ def setup_init_abund_simple(model, disc):
     if model['chemistry']['type']=="Kalyaan":
         X_atom = SimpleH2OAtomAbund(model['grid']['N'])
         X_atom.set_Kalyaan_abundances()
-    elif model['chemistry']['type']=="MINDS" or model['chemistry']['type']=="Extended":
+    elif model['chemistry']['type']=="MINDS" or model['chemistry']['type']=="Extended" or model['chemistry']['type']=="C2H2form":
         X_atom = SimpleAtomAbund(model['grid']['N'])
         X_atom.set_adopted_abundances()
     else:
@@ -324,7 +324,9 @@ def get_simple_chemistry_model(model):
     elif chem_type == 'NoReact':
         chemistry = EquilibriumCNOChemOberg(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'MINDS' or chem_type == 'Extended':
-        chemistry = EquilibriumChemExtended(fix_ratios=True,      a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+        chemistry = EquilibriumChemExtended(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+    elif chem_type == 'C2H2form':
+        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     else:
         raise ValueError("Unknown chemical model type")
 
