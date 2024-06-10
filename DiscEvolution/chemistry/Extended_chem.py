@@ -100,11 +100,11 @@ class SimpleMolAbund(ChemicalAbund):
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
                    'H2O', 'O2',
-                   'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2',
+                   'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2', 'C2H4', 'C2H6',
                    'H2','He']
         mol_mass = [76., 12.,
                     18., 32.,
-                    44., 28., 32., 16., 26.,
+                    44., 28., 32., 16., 26., 28., 30.,
                     2., 4.]
 
         super(SimpleMolAbund, self).__init__(mol_ids, mol_mass, *sizes)
@@ -120,6 +120,8 @@ class SimpleMolAbund(ChemicalAbund):
                         'CH3OH': {'C': 1, 'O': 1, 'H': 4, },
                         'CH4': {'C': 1, 'H': 4, },
                         'C2H2': {'C': 2, 'H': 2, },
+                        'C2H4': {'C': 2, 'H': 4, },
+                        'C2H6': {'C': 2, 'H': 6, },
                         'H2': {'H': 2, },
                         'He': {'He': 1, },
                         }
@@ -186,7 +188,7 @@ class ChemExtended(object):
         return alpha * (T/300)**beta * np.exp(-gamma/T)
 
     def UMISTformat_CR(self, T, alpha, beta, gamma):
-        return alpha * (T/300)**beta * gamma * self._zetaCR/1.36e-17
+        return alpha * (T/300)**beta * gamma # * self._zetaCR/1.36e-17
 
     def initial_molecular_abundance(self, atomic_abund):
         """Compute the initial fractions of species present given total abundances
@@ -218,6 +220,8 @@ class ChemExtended(object):
         mol_abund['CH3OH']    = 0.01 * C
         mol_abund['CH4']      = 0.01 * C
         mol_abund['C2H2']     = 0.00 * C
+        mol_abund['C2H4']     = 0.00 * C
+        mol_abund['C2H6']     = 0.00 * C
         
         # Assign O budget; water is 20%, any remainder goes into O2
         mol_abund['H2O']      = 0.20 * O
