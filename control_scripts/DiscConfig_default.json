@@ -21,9 +21,9 @@
 "eos" : {
 "type" : "iso",
 "opacity" : "Tazzari2016",
-"h0" : 0.033,
+"h0" : 0.021,
 "q" : -0.25,
-"mu" : 2.5
+"mu" : 2.34
 },
 
 "star" : {
@@ -39,7 +39,7 @@
 },
 
 "output" : {
-"directory" : "dusty_disc",
+"directory" : "output_",
 "base" : "disc",
 "format" : "ascii",
 "arrange" : "log",
