@@ -280,7 +280,7 @@ class ThermalChem(object):
         self._nu_pre = {'c-ASW':    {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 6.81e16, 'CO' : 9.14e14, 'CH3OH' : 3.18e17, 'CH4': 5.43e13},
                         'silicate': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
                         'graphite': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
-                        'pure':     {'H2O' : 1.3e18,  'O2' : 1.3e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14, 'C2H2': 3e16, 'C2H4': 4e15, 'C2H6': 6e16}}
+                        'pure':     {'H2O' : 1.3e18,  'O2' : 3.2e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14, 'C2H2': 3e16, 'C2H4': 4e15, 'C2H6': 6e16}}
                         
         # Number of dust grains per hydrogen nucleus, eta:
         m_g = 4*np.pi * rho_s * a**3 / 3
