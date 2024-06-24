@@ -153,9 +153,10 @@ class ChemExtended(object):
         fix_NH3    : Whether to fix the nitrogen abundance when recomputing the
                      molecular abundances
     """
-    def __init__(self, ratesFile=None, zetaCR=1.36e-17):
+    def __init__(self, ratesFile=None, zetaCR=1.30e-17):
         """Initialisation of reactions""" 
         self._zetaCR = zetaCR
+        self._atunnel = 1.0e-8
         self._gas_reactions = []
         self._gas_rates     = []
         self._ice_reactions = []
@@ -176,7 +177,7 @@ class ChemExtended(object):
                     self._gas_rates.append((float(alpha),float(beta),float(gamma)))
                     
         self._Nreacts = len(self._gas_reactions+self._ice_reactions)
-        print("Included {} reactions:\n".format(self._Nreacts), '\n'.join(self._gas_reactions))
+        print("Included {} reactions:\n".format(self._Nreacts), '\n'.join(self._gas_reactions), '\n'.join(self._ice_reactions))
 
     def ASCII_header(self):
         """Extended chem header"""
@@ -191,33 +192,28 @@ class ChemExtended(object):
         return alpha * (T/300)**beta * np.exp(-gamma/T)
 
     def UMISTformat_CR(self, T, alpha, beta, gamma):
-        return alpha * (T/300)**beta * gamma
+        return self._zetaCR * (T/300)**beta * gamma
 
     def grain_surface(self, T, n_d, n_ice, spec1, spec2, Ebar):
         Nsites_tot = self._mu * self._etaNbind * n_d
         Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
-        atunnel = 1.0e-8
-        hbar = 1.05e-27
         fdiff = 0.3
         mu = self.reduced_mass(spec1,spec2)
         nu1, nu2 = self._nu_pre['pure']['spec1'], self._nu_pre['pure']['spec2']
         T1,  T2  = self._Tbind['pure']['spec1'],  self._Tbind['pure']['spec2']
-        Prob_spec1_spec2 = np.exp(-2.*atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
+        Prob_spec1_spec2 = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
         return Cgr * Prob_spec1_spec2 * (nu1 * np.exp(-fdiff*T1/T) + nu2 * np.exp(-fdiff*T2/T))
 
     def grain_surface_H(self, T, n_d, n_ice, Ebar = 860):
-        """Reaction rate of H on grain surfaces, modelled as 3*reaction with H2S"""
+        """Reaction rate with H on grain surfaces"""
         Nsites_tot = self._mu * self._etaNbind * n_d
-        #print(np.min(n_ice), np.min(Nsites_tot))
         Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
-        atunnel = 1.0e-8
-        hbar = 1.05e-27
         fdiff = 0.3
         mu = 34/35
         nu_H  = 1.54e11
         Hbind = 450
-        hop_H = np.maximum( np.exp(-fdiff*Hbind/T), np.exp(-2.*atunnel/hbar * np.sqrt(2.*m_H*k_B*fdiff*Hbind )) )
-        Prob_spec1_H = np.exp(-2.*atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
+        hop_H = np.maximum( np.exp(-fdiff*Hbind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*m_H*k_B*fdiff*Hbind )) )
+        Prob_spec1_H = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
         return Cgr * Prob_spec1_H * nu_H * hop_H
 
     def initial_molecular_abundance(self, atomic_abund, T, rho_dust):
@@ -290,9 +286,12 @@ class ChemExtended(object):
         returns:
             nmol : array(3, N) molecular mass-densities
         """
+        calc_dt = np.inf
+        
         # Define 'densities' of refractories and ices
         n_d   = 0.
         n_ice = 0.
+        He_sinks = rho/m_H * (gas_abund['H2']/gas_abund.mass('H2')) *  self.UMISTformat(T, 4e-14, 0, 0) # Base level is H2 ionization
         for spec in ice_abund.species:
             if spec=='H' or spec=='He':
                 continue
@@ -314,7 +313,6 @@ class ChemExtended(object):
             products  = products.split('+')
             weights_p = [float(product.split('*')[0]) if '*' in product else 1.0 for product in products]
             products  = [product.split('*')[-1] for product in products]
-            
             if 'CR' in reactants:
                 raise NotImplementedError
             elif "H" in reactants:
@@ -324,7 +322,7 @@ class ChemExtended(object):
             if "H" in reactants:
                 S_chem_fudge = 3
                 n_S_ice = 2e-8 * rho / (self._mu*m_H)
-                k_CR = self.UMISTformat_CR(T, 1.30e-17, 0, 2.4)
+                k_CR = self.UMISTformat_CR(T, self._zetaCR, 0, 2.4)
                 k_react = self.grain_surface_H(T, n_d, n_ice) * S_chem_fudge * n_S_ice
                 ice_abund_H = k_CR/k_react * n_H2
                 weights_r.pop(reactants.index('H'))
@@ -346,6 +344,10 @@ class ChemExtended(object):
                 krate = self.UMISTformat_CR(T, *rate)
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
+            elif 'Hej' in reactants:
+                krate = self.UMISTformat(T, *rate)
+                reactants[reactants.index('Hej')]='He'
+                He_sinks += rho/m_H * (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * krate
             else:
                 krate = self.UMISTformat(T, *rate)
             if len(reactants)==2:            
@@ -355,7 +357,39 @@ class ChemExtended(object):
             else:
                 raise NotImplementedError
                 
+        ## Return timestep 
+        if dt is None:
+            # Grain surface
+            for react, rate in zip(self._ice_reactions,self._ice_rates):
+                reactants, products = react.replace(' ','').split('->')
+                reactants = reactants.split('+')
+                weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
+                reactants = [reactant.split('*')[-1] for reactant in reactants]
+                if 'CR' in reactants:
+                    raise NotImplementedError
+                elif "H" in reactants:
+                    weights_r.pop(reactants.index('H'))
+                    reactants.pop(reactants.index('H'))
+                for r, w in zip(reactants, weights_r):
+                    calc_dt = min(calc_dt, np.nanmin(ice_abund[r]/(ice_abund.mass(r) * norm_rates[react] * w)))
+            # Gas phase
+            for react, rate in zip(self._gas_reactions,self._gas_rates):
+                reactants, products = react.replace(' ','').split('->')
+                reactants = reactants.split('+')
+                weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
+                reactants = [reactant.split('*')[-1] for reactant in reactants]
+                if 'CR' in reactants:
+                    weights_r.pop(reactants.index('CR'))
+                    reactants.pop(reactants.index('CR'))
+                elif 'Hej' in reactants:
+                    reactants[reactants.index('Hej')]='He'
+                    norm_rates[react] *= 0.65*self._zetaCR/He_sinks
+                for r, w in zip(reactants, weights_r):
+                    calc_dt = min(calc_dt, np.nanmin(gas_abund[r]/(gas_abund.mass(r) * norm_rates[react] * w)))
+            return calc_dt
+                
         ## Apply reaction rates
+        # Grain surface
         for react, rate in zip(self._ice_reactions,self._ice_rates):
             reactants, products = react.replace(' ','').split('->')
             reactants = reactants.split('+')
@@ -364,13 +398,16 @@ class ChemExtended(object):
             products  = products.split('+')
             weights_p = [float(product.split('*')[0]) if '*' in product else 1.0 for product in products]
             products  = [product.split('*')[-1] for product in products]
-            if "H" in reactants:
+            if 'CR' in reactants:
+                raise NotImplementedError
+            elif "H" in reactants:
                 weights_r[reactants.index('H')]/=2.0
                 reactants[reactants.index('H')]='H2'
             for r, w in zip(reactants, weights_r):
                 ice_abund[r] -= ice_abund.mass(r) * norm_rates[react] * w * dt
             for p, w in zip(products, weights_p):
                 ice_abund[p] += ice_abund.mass(p) * norm_rates[react] * w * dt
+        # Gas phase
         for react, rate in zip(self._gas_reactions,self._gas_rates):
             reactants, products = react.replace(' ','').split('->')
             reactants = reactants.split('+')
@@ -382,6 +419,9 @@ class ChemExtended(object):
             if 'CR' in reactants:
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
+            elif 'Hej' in reactants:
+                reactants[reactants.index('Hej')]='He'
+                norm_rates[react] *= 0.65*self._zetaCR/He_sinks
             for r, w in zip(reactants, weights_r):
                 gas_abund[r] -= gas_abund.mass(r) * norm_rates[react] * w * dt
             for p, w in zip(products, weights_p):
@@ -401,7 +441,7 @@ class ChemExtended(object):
         dt = np.inf
         if self._Nreacts==0:
             return dt
-        
+            
         T = disc.T
         rho = disc.midplane_gas_density
         ice_abund = disc.chem.ice
@@ -409,67 +449,8 @@ class ChemExtended(object):
         tot_abund = ice_abund.copy()
         tot_abund += gas_abund.copy()
         self._mu = tot_abund.mu()
-        # Define 'densities' of refractories and ices
-        n_d   = 0.
-        n_ice = 0.
-        for spec in ice_abund.species:
-            if spec=='H' or spec=='He':
-                continue
-            elif spec=='H2':
-                n_H2   = rho*gas_abund[spec]/(gas_abund.mass(spec)*m_H)
-            elif 'grain' in spec:
-                n_d   += rho*ice_abund[spec]/(self._mu*m_H)
-            else:
-                n_ice += rho*ice_abund[spec]/(ice_abund.mass(spec)*m_H)
-
-        for react, rate in zip(self._ice_reactions,self._ice_rates):
-            reactants, products = react.replace(' ','').split('->')
-            reactants = reactants.split('+')
-            weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
-            reactants = [reactant.split('*')[-1] for reactant in reactants]
-
-            if 'CR' in reactants:
-                raise NotImplementedError
-            elif "H" in reactants:
-                krate = self.grain_surface_H(T, n_d, n_ice, rate[-1])
-            else:
-                krate = self.grain_surface(T, n_d, n_ice, *rate)
-            if "H" in reactants:
-                S_chem_fudge = 3
-                n_S_ice = 2e-8 * rho / (self._mu*m_H)
-                k_CR = self.UMISTformat_CR(T, 1.30e-17, 0, 2.4)
-                k_react = self.grain_surface_H(T, n_d, n_ice) * S_chem_fudge * n_S_ice
-                ice_abund_H = k_CR/k_react * n_H2
-                weights_r.pop(reactants.index('H'))
-                reactants.pop(reactants.index('H'))
-                norm_rate = ice_abund_H * (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * krate/Omega0
-            else:
-                norm_rate = rho/m_H * (ice_abund[reactants[0]]/ice_abund.mass(reactants[0])) * (ice_abund[reactants[1]]/ice_abund.mass(reactants[1])) * krate/Omega0
-
-            for r, w in zip(reactants, weights_r):
-                dt = min(dt, np.nanmin(ice_abund[r]/(ice_abund.mass(r) * norm_rate * w)))
-                
-        for react, rate in zip(self._gas_reactions,self._gas_rates):
-            reactants, products = react.replace(' ','').split('->')
-            reactants = reactants.split('+')
-            weights_r = [float(reactant.split('*')[0]) if '*' in reactant else 1.0 for reactant in reactants]
-            reactants = [reactant.split('*')[-1] for reactant in reactants]
-            
-            if 'CR' in reactants:
-                krate = self.UMISTformat_CR(T, *rate)
-                weights_r.pop(reactants.index('CR'))
-                reactants.pop(reactants.index('CR'))
-            else:
-                krate = self.UMISTformat(T, *rate)
-            if len(reactants)==2:            
-                norm_rate = rho/m_H * (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * (gas_abund[reactants[1]]/gas_abund.mass(reactants[1])) * krate/Omega0
-            elif len(reactants)==1:
-                norm_rate = (gas_abund[reactants[0]]/gas_abund.mass(reactants[0])) * krate/Omega0
-            else:
-                raise NotImplementedError
-                
-            for r, w in zip(reactants, weights_r):
-                dt = min(dt, np.nanmin(gas_abund[r]/(gas_abund.mass(r) * norm_rate * w)))
+        
+        dt = self.convert_molecular_abundance(T, rho, ice_abund, gas_abund, None)
                 
         return dt/np.e  # Add a factor of e to avoid going exactly to 0 in non-empty cells
         
