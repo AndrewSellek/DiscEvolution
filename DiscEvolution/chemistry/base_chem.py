@@ -109,8 +109,14 @@ class ChemicalAbund(object):
         return self._mass[self._indexes[k]]
 
     def mu(self):
-        '''Mean molecular weight'''
+        """Mean molecular weight"""
         return self._data.sum(0) / (self._data.T / self._mass).sum(1)
+        
+    def reduced_mass(self, spec1, spec2):
+        """Reduced mass"""
+        m1 = self.mass(spec1)
+        m2 = self.mass(spec2)
+        return m1*m2/(m1+m2)
 
     @property
     def masses(self):
@@ -200,7 +206,7 @@ class SimpleChemBase(object):
         """Compute the equilibrium chemistry
         Used only to calculate an initial condition"""
 
-        ice = self.initial_molecular_abundance(abund)
+        ice = self.initial_molecular_abundance(abund, T, rho*dust_frac)
         gas = ice.copy()
         self._mu = ice.mu()
         
@@ -285,6 +291,7 @@ class ThermalChem(object):
         #      grain are covered. Thus the desorption rate is limited to be
         #      proportional to min(X_ice, X_max) i.e. zeroth order
         N_bind = sig_b * 4*np.pi * a**2 * f_bind
+        self._Nsites = N_bind
         self._etaNbind = eta*N_bind
         
         # Cache the thermal adsorption/desorption coefficients
@@ -320,33 +327,72 @@ class ThermalChem(object):
     def _v_therm(self, T, m_mol):
         """Thermal velocity of the species in the gas"""
         return self._v0 * np.sqrt(T/m_mol)
+        
+    def _H_surface_react(self, T, n, n_ice, dust_frac):
+        """Reaction rate of H on grain surfaces, modelled as 3*reaction with H2S"""
+        Nsites_tot = self._mu * self._etaNbind * dust_frac * n
+        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        nu_H  = 1.54e11
+        Hbind = 450
+        barrier = 860
+        atunnel = 1e-8
+        hbar = 1.05e-27
+        fdiff = 0.3
+        hop_H = np.maximum( np.exp(-fdiff*Hbind/T), np.exp(-2.*atunnel/hbar * np.sqrt(2. * 34/35 * m_H * k_B * fdiff * Hbind )) )
+        S_chem_fudge = 3
+        n_S_ice = 2e-8 * n
+        Prob_H2S_H = np.exp(-2.*atunnel/hbar * np.sqrt(2. * 34/35 * m_H * k_B * barrier))
+        return Cgr * nu_H * hop_H * S_chem_fudge * n_S_ice * Prob_H2S_H / Omega0
 
     def _equilibrium_ice_abund(self, T, rho, dust_frac, f_small, R, SigmaG, spec, tot_abund, use_HH=False):
-
-        if 'grain' in spec:
-            return tot_abund[spec]
-        if spec=='H2' or spec=='He':
-            return 0.
-        
-        Tbind = self._Tbind['pure'][spec]
-        if use_HH:
-            nu_pre = self._nu_i(Tbind, m_mol)   # Hasegawa & Herbst Approximation
-        else:
-            nu_pre = self._nu_pre['pure'][spec] # Experimental Values
-        m_mol = tot_abund.mass(spec)
-
+        # Available budget
         n = rho / (self._mu*m_H)
+        m_mol = tot_abund.mass(spec)
         X_t = tot_abund[spec] * self._mu / m_mol
 
-        # Adsorption & desorption rate per molecule
-        Sa = self._f_ads * self._mu * self._v_therm(T, m_mol)  * dust_frac * n
-        Sd = self._f_des * nu_pre * np.exp(-Tbind/T) 
+        # Potential ice
+        """
+        n_ice = 0
+        for speci in tot_abund.species:
+            if 'grain' in speci:
+                continue
+            if speci=='H2' or speci=='H' or speci=='He':
+                continue
+            n_ice += rho*tot_abund[speci]/(tot_abund.mass(speci)*m_H)
+        """
 
-        X_max = self._mu * self._etaNbind * dust_frac
-        
-        X_eq = X_t - np.minimum(X_t   * Sd/(Sa + Sd + 1e-300),
-                                X_max * Sd/(Sa + 1e-300))
-        return X_eq * m_mol / self._mu * (dust_frac>0)    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
+        # Adsorption rate per molecule
+        Sa = self._f_ads * self._mu * self._v_therm(T, m_mol)  * dust_frac * n
+                
+        # Balance
+        if 'grain' in spec:
+            ## Assumed always solid (no sublimation)
+            return tot_abund[spec]
+        elif spec=='H2' or spec=='He' or spec=='H':
+            ## Assumed never solid (completely volatile)
+            return 0.
+            """
+            elif spec=='H':
+                ## Special case - reaction is main sink not desorption
+                Sr = self._H_surface_react(T, n, n_ice, dust_frac)
+                X_eq = X_t * Sa/(Sa + Sr + 1e-300)
+                return X_eq * m_mol / self._mu * (dust_frac>0)    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
+            """
+        else:
+            ## Usual adsorption/desorption balance
+            # Desorption parameters
+            Tbind = self._Tbind['pure'][spec]
+            if use_HH:
+                nu_pre = self._nu_i(Tbind, m_mol)   # Hasegawa & Herbst Approximation
+            else:
+                nu_pre = self._nu_pre['pure'][spec] # Experimental Values
+            # Maximum that can actually desorb (surface layer)
+            X_max = self._mu * self._etaNbind * dust_frac
+            # Desorption rate per molecule
+            Sd = self._f_des * nu_pre * np.exp(-Tbind/T)             
+            X_eq = X_t - np.minimum(X_t   * Sd/(Sa + Sd + 1e-300),
+                                    X_max * Sd/(Sa + 1e-300))
+            return X_eq * m_mol / self._mu * (dust_frac>0)    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
     
     def _update_ice_balance(self, dt, T, rho, dust_frac, spec, abund, use_HH=False):
 
