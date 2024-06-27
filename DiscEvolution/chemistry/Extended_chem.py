@@ -101,11 +101,13 @@ class SimpleMolAbund(ChemicalAbund):
         mol_ids = ['Si-grain', 'C-grain',
                    'H2O', 'O2',
                    'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2', 'C2H4', 'C2H6',
-                   'H','H2','He']
+                   'H',
+                   'H2','He']
         mol_mass = [76., 12.,
                     18., 32.,
                     44., 28., 32., 16., 26., 28., 30.,
-                    1., 2., 4.]
+                    1.,
+                    2., 4.]
 
         super(SimpleMolAbund, self).__init__(mol_ids, mol_mass, *sizes)
 
@@ -157,6 +159,7 @@ class ChemExtended(object):
         """Initialisation of reactions""" 
         self._zetaCR = zetaCR
         self._atunnel = 1.0e-8
+        self._fdiff = 0.3
         self._gas_reactions = []
         self._gas_rates     = []
         self._ice_reactions = []
@@ -203,22 +206,30 @@ class ChemExtended(object):
     def grain_surface(self, T, n_d, n_ice, spec1, spec2, Ebar):
         Nsites_tot = self._mu * self._etaNbind * n_d
         Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
-        fdiff = 0.3
         nu1, nu2 = self._nu_pre['pure'][spec1], self._nu_pre['pure'][spec2]
         T1,  T2  = self._Tbind['pure'][spec1],  self._Tbind['pure'][spec2]
         Prob_spec1_spec2 = np.exp(-Ebar/T)
-        return Cgr * Prob_spec1_spec2 * (nu1 * np.exp(-fdiff*T1/T) + nu2 * np.exp(-fdiff*T2/T))
+        return Cgr * Prob_spec1_spec2 * (nu1 * np.exp(-self._fdiff*T1/T) + nu2 * np.exp(-self._fdiff*T2/T))
 
     def grain_surface_H(self, T, n_d, n_ice, Ebar = 860, mu=34/35):
         """Reaction rate with H on grain surfaces"""
         Nsites_tot = self._mu * self._etaNbind * n_d
         Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
-        fdiff = 0.3
-        nu_H  = 1.54e11
+        nu_H  = 1.54e11     # ASW value in Minissale review
         Hbind = 450         # ASW value in Minissale review
-        hop_H = np.maximum( np.exp(-fdiff*Hbind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*m_H*k_B*fdiff*Hbind )) )
+        hop_H = np.maximum( np.exp(-self._fdiff*Hbind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*m_H*k_B*self._fdiff*Hbind )) )
         Prob_spec1_H = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
         return Cgr * Prob_spec1_H * nu_H * hop_H
+        
+    def grain_surface_H2(self, T, n_d, n_ice, Ebar = 0, mu = 1):
+        """Reaction rate with H2 on grain surfaces"""
+        Nsites_tot = self._mu * self._etaNbind * n_d
+        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        nu_H2  = 1.98e11    # ASW value in Minissale review
+        H2bind = 371        # ASW value in Minissale review
+        hop_H2 = np.maximum( np.exp(-self._fdiff*H2bind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*2.*m_H*k_B*self._fdiff*H2bind )) )
+        Prob_spec1_H2 = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
+        return Cgr * Prob_spec1_H2 * nu_H2 * hop_H2
 
     def initial_molecular_abundance(self, atomic_abund, T, rho_dust):
         """Compute the initial fractions of species present given total abundances
@@ -263,14 +274,14 @@ class ChemExtended(object):
         mol_abund['He']       = He
         for spec in ['H2O','CH3OH','CH4','C2H2','C2H4','C2H6']:
             H -= mol_abund[spec]*mol_abund._n_spec[spec]['H']
-        mol_abund['H2']       = np.maximum(H, 0.) / mol_abund._n_spec['H2']['H']
         """
         k_CR  = self.UMISTformat_CR(T, 1.30e-17, 0, 2.4) / Omega0                       # Assuming 2.4 H created per CR ionization (Krijt et al. 2020)
         k_ads = self._f_ads * self._v_therm(T, mol_abund.mass(spec)) * rho_dust / m_H
         fatom = k_CR/(k_CR+k_ads)
+        """
+        fatom = 0
         mol_abund['H']        = np.maximum(H, 0.) * fatom / mol_abund._n_spec['H']['H']
         mol_abund['H2']       = np.maximum(H, 0.) * (1-fatom) / mol_abund._n_spec['H2']['H']
-        """
 
         #  Convert number abundances with respect to total number of atoms to mass fractions
         for spec in mol_abund.species:
@@ -300,6 +311,7 @@ class ChemExtended(object):
                 continue
             elif spec=='H2':
                 n_H2   = rho*gas_abund[spec]/(gas_abund.mass(spec)*m_H)
+                n_ice += rho*ice_abund[spec]/(ice_abund.mass(spec)*m_H)
             elif 'grain' in spec:
                 n_d   += rho*ice_abund[spec]/(self._mu*m_H)
             else:
@@ -315,8 +327,8 @@ class ChemExtended(object):
         k_CR = self.UMISTformat_CR(T, self._zetaCR, 0, 2.4)
         ice_abund_H = k_CR/k_S * n_H2
         # Define basic sinks                
-        He_sinks = rho/m_H * (gas_abund['H2']/gas_abund.mass('H2')) * self.UMISTformat(T, 4e-14, 0, 0)  # Base level is H2 ionization
-        OH_sinks = ice_abund_H * self.grain_surface_H(T, n_d, n_ice, 0, mu=17/18)                       # Base level is H2O formation
+        He_sinks = rho/m_H * (gas_abund['H2']/gas_abund.mass('H2')) * self.UMISTformat(T, 4e-14, 0, 0)                                                                                  # Base level is H2 ionization
+        OH_sinks = ice_abund_H * self.grain_surface_H(T, n_d, n_ice, 0, 17/18) + rho/m_H * (ice_abund['H2']/ice_abund.mass('H2')) * self.grain_surface_H2(T, n_d, n_ice, 2600, 34/19)   # Base level is H2O formation  #self.grain_surface(T, n_d, n_ice, 'H', 'OH', 2600.)
                 
         ## Store all rates before doing reactions
         norm_rates = {}
@@ -334,7 +346,7 @@ class ChemExtended(object):
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
             elif "H" in reactants:
-                krate = self.grain_surface_H(T, n_d, n_ice, rate[-1], mu=gas_abund.reduced_mass(reactants[0],reactants[1]))
+                krate = self.grain_surface_H(T, n_d, n_ice, rate[-1], ice_abund.reduced_mass(reactants[0],reactants[1]))
             elif "OH" in reactants:
                 krate = self.grain_surface(T, n_d, n_ice, *rate)
                 reactants[reactants.index('OH')]='H2O'
