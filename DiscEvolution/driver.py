@@ -8,7 +8,6 @@
 from __future__ import print_function
 import numpy as np
 import os
-from .photoevaporation import FixedExternalEvaporation
 from .constants import yr
 from . import io
 
@@ -36,7 +35,7 @@ class DiscEvolutionDriver(object):
         t_out:Previous output times, default = None, years
     """
 
-    def __init__(self, disc, gas=None, dust=None, diffusion=None, chemistry=None, ext_photoevaporation=None, int_photoevaporation=None, history=None, t0=0.):
+    def __init__(self, disc, gas=None, dust=None, diffusion=None, chemistry=None, ext_photoevaporation=None, int_photoevaporation=None, collapse=None, history=None, t0=0.):
 
         self._disc = disc
 
@@ -46,6 +45,7 @@ class DiscEvolutionDriver(object):
         self._chemistry = chemistry
         self._external_photo = ext_photoevaporation
         self._internal_photo = int_photoevaporation
+        self._collapse  = collapse
 
         self._history = history
 
@@ -131,6 +131,10 @@ class DiscEvolutionDriver(object):
         # Do internal photoevaporation
         if self._internal_photo:
             self._internal_photo(disc, dt/yr, self._external_photo)
+
+        # Do collape from envelope
+        if self._collapse:
+            self._collapse(disc, self.t, dt)
 
         # Chemistry
         if self._chemistry:
@@ -224,6 +228,8 @@ class DiscEvolutionDriver(object):
             head += self._external_photo.ASCII_header() + '\n'
         if self._internal_photo:
             head += self._internal_photo.ASCII_header() + '\n'
+        if self._collapse:
+            head += self._collapse.ASCII_header() + '\n'
 
         # Write it all to disc
         io.dump_ASCII(filename, self._disc, self.t, head)
@@ -237,6 +243,7 @@ class DiscEvolutionDriver(object):
         if self._chemistry:      headers.append(self._chemistry.HDF5_attributes())
         if self._external_photo: headers.append(self._external_photo.HDF5_attributes())
         if self._internal_photo: headers.append(self._internal_photo.HDF5_attributes())
+        if self._collapse:       headers.append(self._collapse.HDF5_attributes())
 
         io.dump_hdf5(filename, self._disc, self.t, headers)
 

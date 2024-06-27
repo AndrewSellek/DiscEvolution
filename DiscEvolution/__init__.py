@@ -12,6 +12,8 @@ __all__  = [
     "io",
     "opacity",
     "photoevaporation",
+    "internal_photo",
+    "collapse",
     "planet_formation",
     "star",
     "viscous_evolution",

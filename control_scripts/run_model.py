@@ -25,6 +25,7 @@ from DiscEvolution.io import Event_Controller, DiscReader
 from DiscEvolution.disc_utils import mkdir_p
 from DiscEvolution.internal_photo import EUVDiscAlexander, XrayDiscOwen, XrayDiscPicogna
 from DiscEvolution.history import History
+from DiscEvolution.collapse import HuesoGuillot05
 import DiscEvolution.photoevaporation as photoevaporation
 
 from DiscEvolution.chemistry import (
@@ -498,10 +499,16 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
     except KeyError:
         internal_photo = None    
 
+    # Add collapse from envelope
+    collapse = None
+    if 'collapse' in model.keys():
+        if model['collapse']['Menv']>0.0:
+            collapse = HuesoGuillot05(disc, Menv=model['collapse']['Menv'], tenv=model['collapse']['tenv'], omega_cd=model['collapse']['omega'], T_cd=model['collapse']['T'])
+
     return DiscEvolutionDriver(disc, 
                                gas=gas, dust=dust, diffusion=diffuse,
                                chemistry=chemistry,
-                               ext_photoevaporation=photoevap, int_photoevaporation=internal_photo,
+                               ext_photoevaporation=photoevap, int_photoevaporation=internal_photo, collapse=collapse,
                                history=history, t0=start_time)
 
 ###
