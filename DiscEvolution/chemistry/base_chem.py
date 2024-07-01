@@ -286,7 +286,7 @@ class ThermalChem(object):
                         
         # Number of dust grains per hydrogen nucleus, eta:
         m_g = 4*np.pi * rho_s * a**3 / 3
-        eta = m_H / m_g
+        self._eta = m_H / m_g
         
         # X_max = (d2g) * eta * Nbind
         #      When X_ice > X_max all first layer binding sites on the
@@ -294,14 +294,14 @@ class ThermalChem(object):
         #      proportional to min(X_ice, X_max) i.e. zeroth order
         N_bind = sig_b * 4*np.pi * a**2 * f_bind
         self._Nsites = N_bind
-        self._etaNbind = eta*N_bind
+        self._etaNbind = self._eta*N_bind
         
         # Cache the thermal adsorption/desorption coefficients
         self._nu0 = np.sqrt(2 * sig_b * k_B / (m_H *np.pi**2))
         self._v0  = np.sqrt(8 * k_B / (m_H * np.pi))
         
         self._f_des = (1/Omega0) 
-        self._f_ads = (1/Omega0) * np.pi*a**2 * f_stick*eta
+        self._f_ads = (1/Omega0) * np.pi*a**2 * f_stick*self._eta
         
         # Create basic header
         head = 'sig_b: {} cm^-2, rho_s: {} g cm^-1, a: {} cm, f_bind: {}, f_stick: {}'

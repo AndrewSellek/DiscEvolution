@@ -327,8 +327,8 @@ class ChemExtended(object):
         k_CR = self.UMISTformat_CR(T, self._zetaCR, 0, 2.4)
         ice_abund_H = k_CR/k_S * n_H2
         # Define basic sinks                
-        He_sinks = rho/m_H * (gas_abund['H2']/gas_abund.mass('H2')) * self.UMISTformat(T, 4e-14, 0, 0)                                                                                  # Base level is H2 ionization
-        OH_sinks = ice_abund_H * self.grain_surface_H(T, n_d, n_ice, 0, 17/18) + rho/m_H * (ice_abund['H2']/ice_abund.mass('H2')) * self.grain_surface_H2(T, n_d, n_ice, 2600, 34/19)   # Base level is H2O formation  #self.grain_surface(T, n_d, n_ice, 'H', 'OH', 2600.)
+        He_sinks = rho/m_H * (gas_abund['H2']/gas_abund.mass('H2')) * self.UMISTformat(T, 4e-14, 0, 0) + (self._mu * self._eta * n_d) * self.UMISTformat(T, 2.06e-4, 0, 0)              # Base level is H2 ionization and grain collisions
+        OH_sinks = ice_abund_H * self.grain_surface_H(T, n_d, n_ice, 0, 17/18) + rho/m_H * (ice_abund['H2']/ice_abund.mass('H2')) * self.grain_surface_H2(T, n_d, n_ice, 2600, 34/19)   # Base level is H2O formation from H and H2
                 
         ## Store all rates before doing reactions
         norm_rates = {}
