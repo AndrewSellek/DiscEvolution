@@ -84,6 +84,8 @@ class DiscEvolutionDriver(object):
             dt = min(dt,Dt_min)
         if self._chemistry and hasattr(self._chemistry, 'max_timestep'):
             dt = min(dt, self._chemistry.max_timestep(self._disc))
+        if self._collapse:
+            dt = min(dt, self._collapse.max_timestep(self._disc, self.t))
         
         # Determine tracers for dust step
         gas_chem, ice_chem = None, None
