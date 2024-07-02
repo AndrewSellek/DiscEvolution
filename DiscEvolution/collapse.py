@@ -44,6 +44,8 @@ class CollapseBase(object):
                 if disc.chem:
                     for k in self.chem.keys():
                         disc.chem.ice[k] += (self.chem[k]-disc.chem.ice[k])*dSS/(1+dSS)
+                    disc.update_ices(disc.chem.ice)
+                    disc.update(dt)
                 elif hasattr(disc, "integ_dust_frac"):
                     disc._eps[0] += (self._dust_frac*(1-disc._fm)-disc._eps[0])*dSS/(1+dSS)
                     disc._eps[1] += (self._dust_frac*disc._fm-disc._eps[1])*dSS/(1+dSS)
