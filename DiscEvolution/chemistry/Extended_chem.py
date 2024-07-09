@@ -99,12 +99,16 @@ class SimpleMolAbund(ChemicalAbund):
 
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
+                   #'S-grain',
                    'H2O', 'O2',
+                   #'NH3', 'N2',
                    'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2', 'C2H4', 'C2H6',
                    'H',
                    'H2','He']
         mol_mass = [76., 12.,
+                    #32.,
                     18., 32.,
+                    #17., 28.,
                     44., 28., 32., 16., 26., 28., 30.,
                     1.,
                     2., 4.]
@@ -115,8 +119,11 @@ class SimpleMolAbund(ChemicalAbund):
         self._n_spec = {
                         'Si-grain': {'O': 3, 'Si': 1, },
                         'C-grain': {'C': 1, },
+                        #'S-grain': {'S': 1, },
                         'H2O': {'O': 1, 'H': 2, },
                         'O2': {'O': 2, },
+                        #'NH3': {'N': 1, 'H': 3, },
+                        #'N2': {'N': 2, },
                         'CO2': {'C': 1, 'O': 2, },
                         'CO': {'C': 1, 'O': 1, },
                         'CH3OH': {'C': 1, 'O': 1, 'H': 4, },
@@ -245,15 +252,17 @@ class ChemExtended(object):
         H  = atomic_abund.number_abund('H')
         He = atomic_abund.number_abund('He')
         C  = atomic_abund.number_abund('C')
+        #N  = atomic_abund.number_abund('N')
         O  = atomic_abund.number_abund('O')
         Si = atomic_abund.number_abund('Si')
+        #S  = atomic_abund.number_abund('S')
 
         # Set up the number abundances for molecules
         mol_abund = SimpleMolAbund(atomic_abund.size)
 
-        # Set the grain abundances
-        mol_abund['C-grain']  = 0.39 * C
+        # Set the refractory grain abundances
         mol_abund['Si-grain'] = Si
+        #mol_abund['S-grain']  = S
 
         # Assign C budget
         mol_abund['CO2']      = 0.09 * C
@@ -263,17 +272,27 @@ class ChemExtended(object):
         mol_abund['C2H2']     = 0.00 * C
         mol_abund['C2H4']     = 0.00 * C
         mol_abund['C2H6']     = 0.00 * C
-        
+        for spec in ['CO2','CO','CH3OH','CH4','C2H2','C2H4','C2H6']:
+            C -= mol_abund[spec]*mol_abund._n_spec[spec]['C']
+        mol_abund['C-grain']  = np.maximum(C / mol_abund._n_spec['C-grain']['C'], 0.)
+
+        # Assign N budget; ammonia is 7%, any remainder goes into N2
+        #mol_abund['NH3']      = 0.07 * N
+        #for spec in ['NH3']:
+        #    N -= mol_abund[spec]*mol_abund._n_spec[spec]['N']
+        #mol_abund['N2']       = np.maximum(N / mol_abund._n_spec['N2']['N'], 0.)
+
         # Assign O budget; water is 20%, any remainder goes into O2
         mol_abund['H2O']      = 0.20 * O
         for spec in ['Si-grain','H2O','CO2','CO','CH3OH']:
             O -= mol_abund[spec]*mol_abund._n_spec[spec]['O']
         mol_abund['O2']       = np.maximum(O / mol_abund._n_spec['O2']['O'], 0.)
-        
+
         # Set the volatile abundances
         mol_abund['He']       = He
-        for spec in ['H2O','CH3OH','CH4','C2H2','C2H4','C2H6']:
-            H -= mol_abund[spec]*mol_abund._n_spec[spec]['H']
+        for spec in mol_abund.species:
+            if 'H' in mol_abund._n_spec[spec].keys():
+                H -= mol_abund[spec]*mol_abund._n_spec[spec]['H']
         """
         k_CR  = self.UMISTformat_CR(T, 1.30e-17, 0, 2.4) / Omega0                       # Assuming 2.4 H created per CR ionization (Krijt et al. 2020)
         k_ads = self._f_ads * self._v_therm(T, mol_abund.mass(spec)) * rho_dust / m_H
