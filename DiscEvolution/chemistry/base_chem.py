@@ -219,7 +219,7 @@ class SimpleChemBase(object):
 
 
     def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, **kwargs):
-        # Reportion gas and ice after drift
+        # Reportion gas and ice after drift or source/sink terms
         chem.ice += chem.gas
         chem.gas.data[:] = 0
         self._mu = chem.ice.mu()

@@ -142,7 +142,7 @@ class DustyDisc(AccretionDisc):
         return M_dust
     
     def update(self, dt):
-        """Update the disc properites and age"""
+        """Update the disc properties and age"""
 
         new_age = self._star.age + dt/(2*np.pi)
         self._star.evolve(new_age)
