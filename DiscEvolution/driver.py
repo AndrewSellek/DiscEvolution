@@ -137,6 +137,25 @@ class DiscEvolutionDriver(object):
         # Do collape from envelope
         if self._collapse:
             self._collapse(disc, self.t, dt)
+            
+        # Repin
+        disc.Sigma[:] = np.maximum(disc.Sigma, 0)        
+        try:
+            disc.dust_frac[:] = np.maximum(disc.dust_frac, 0)
+            disc.dust_frac[:] /= np.maximum(disc.dust_frac.sum(0), 1.0)
+        except AttributeError:
+            pass
+        if self._chemistry:
+            disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)   # Nonzero
+            disc.chem.ice.data[:] = np.maximum(disc.chem.ice.data, 0)
+            disc.chem.gas.data[:] /= np.maximum(disc.chem.gas.data.sum(0)/(1-disc.dust_frac.sum(0)), 1.0)   # Sum of gas species shouldn't exceed total gas
+            disc.chem.ice.data[:] /= np.maximum(disc.chem.ice.data.sum(0)/disc.dust_frac.sum(0), 1.0)   # Sum of dust species shouldn't exceed total dust
+            disc.chem.gas.data[:] = np.fmax(disc.chem.gas.data, 0)   # Nonzero
+            disc.chem.ice.data[:] = np.fmax(disc.chem.ice.data, 0)
+
+        # Reupdate dust
+        disc.update(dt)
+
 
         # Chemistry
         if self._chemistry:

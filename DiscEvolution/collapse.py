@@ -38,21 +38,17 @@ class CollapseBase(object):
         else:
             if not dry:
                 dSigma = self.source_profile(disc) * dt
-                print(np.argwhere(np.isnan(np.log10(disc.Sigma_G))), disc.Sigma[np.argwhere(np.isnan(np.log10(disc.Sigma_G)))], disc._eps[:,np.argwhere(np.isnan(np.log10(disc.Sigma_G)))])
                 norm = np.sum(dSigma/dt*2*np.pi*disc.R*np.gradient(disc.R))
                 dSS = dSigma * self._Mdot * Msun/AU**2/yr / norm / disc._Sigma
                 if disc.chem:
                     for k in self.chem.keys():
-                        disc.chem.ice[k] += (self.chem[k]-disc.chem.ice[k])*dSS/(1+dSS)
+                        disc.chem.ice[k] += (self.chem[k]-disc.chem.ice[k])*dSS/(1+dSS) # Assume accreted in ices, will shortly be reassigned anyway
                     disc.update_ices(disc.chem.ice)
                     disc.update(dt)
                 elif hasattr(disc, "integ_dust_frac"):
                     disc._eps[0] += (self._dust_frac*(1-disc._fm)-disc._eps[0])*dSS/(1+dSS)
                     disc._eps[1] += (self._dust_frac*disc._fm-disc._eps[1])*dSS/(1+dSS)
                 disc._Sigma += dSigma * self._Mdot * Msun/AU**2/yr / norm
-                print(np.argwhere(np.isnan(np.log10(disc.Sigma_G))), disc.Sigma[np.argwhere(np.isnan(np.log10(disc.Sigma_G)))], disc._eps[:,np.argwhere(np.isnan(np.log10(disc.Sigma_G)))])
-                if len(np.argwhere(np.isnan(np.log10(disc.Sigma_G))))>0:
-                    raise Exception
             Macc_return = self._Mdot*dt * Msun/yr
         return Macc_return
 
