@@ -51,6 +51,18 @@ class DiscEvolutionDriver(object):
 
         self._t = t0
         self._nstep = 0
+        
+    def _determine_tracers(self, disc):
+        try:
+            gas_chem = disc.chem.gas.data
+            ice_chem = disc.chem.ice.data
+        except AttributeError:
+            gas_chem, ice_chem = None, None
+        try:
+            dust = disc.dust_frac
+        except AttributeError:
+            dust = None
+        return gas_chem, ice_chem, dust
 
     def __call__(self, tmax):
         """Evolve the disc for a single timestep
@@ -88,13 +100,7 @@ class DiscEvolutionDriver(object):
             dt = min(dt, self._collapse.max_timestep(self._disc, self.t))
         
         # Determine tracers for dust step
-        gas_chem, ice_chem = None, None
-        dust = None
-        try:
-            gas_chem = disc.chem.gas.data
-            ice_chem = disc.chem.ice.data
-        except AttributeError:
-            pass
+        gas_chem, ice_chem, dust = self._determine_tracers(disc)
 
         # Do dust evolution        
         if self._dust:
@@ -103,20 +109,11 @@ class DiscEvolutionDriver(object):
                        dust_tracers=ice_chem, v_visc=v_visc)
 
         # Determine tracers for gas steps
-        try:
-            gas_chem = disc.chem.gas.data
-            ice_chem = disc.chem.ice.data
-        except AttributeError:
-            pass
-        try:
-            dust = disc.dust_frac
-        except AttributeError:
-            pass
+        gas_chem, ice_chem, dust = self._determine_tracers(disc)
 
         # Do Advection-diffusion update
         if self._gas:
             self._gas(dt, disc, [dust, gas_chem, ice_chem])
-
         if self._diffusion:
             if gas_chem is not None:
                 gas_chem[:] += dt * self._diffusion(disc, gas_chem)
@@ -153,9 +150,8 @@ class DiscEvolutionDriver(object):
             disc.chem.gas.data[:] = np.fmax(disc.chem.gas.data, 0)   # Nonzero
             disc.chem.ice.data[:] = np.fmax(disc.chem.ice.data, 0)
 
-        # Reupdate dust
-        disc.update(dt)
-
+            # Reupdate dust
+            disc.update_ices(disc.chem.ice)
 
         # Chemistry
         if self._chemistry:
