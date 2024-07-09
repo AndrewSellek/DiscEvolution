@@ -15,3 +15,5 @@ m_n = 1.6725e-24
 m_H = m_e + m_p
 sig_H2 = 2e-15 # Cross-section of H2 molecule
 GasConst = 8.314472e7
+
+hbar = 1.05457182e-27
