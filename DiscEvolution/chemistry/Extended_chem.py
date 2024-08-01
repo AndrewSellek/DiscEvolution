@@ -100,14 +100,14 @@ class SimpleMolAbund(ChemicalAbund):
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
                    #'S-grain',
-                   'H2O', 'O2',
+                   'H2O', 'O2', 'H2O2',
                    #'NH3', 'N2',
                    'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2', 'C2H4', 'C2H6',
                    'H',
                    'H2','He']
         mol_mass = [76., 12.,
                     #32.,
-                    18., 32.,
+                    18., 32., 34.,
                     #17., 28.,
                     44., 28., 32., 16., 26., 28., 30.,
                     1.,
@@ -122,6 +122,7 @@ class SimpleMolAbund(ChemicalAbund):
                         #'S-grain': {'S': 1, },
                         'H2O': {'O': 1, 'H': 2, },
                         'O2': {'O': 2, },
+                        'H2O2': {'O': 2, 'H': 2, },
                         #'NH3': {'N': 1, 'H': 3, },
                         #'N2': {'N': 2, },
                         'CO2': {'C': 1, 'O': 2, },
@@ -284,7 +285,8 @@ class ChemExtended(object):
 
         # Assign O budget; water is 20%, any remainder goes into O2
         mol_abund['H2O']      = 0.20 * O
-        for spec in ['Si-grain','H2O','CO2','CO','CH3OH']:
+        mol_abund['H2O2']     = 0.00 * O
+        for spec in ['Si-grain','H2O','CO2','CO','CH3OH','H2O2']:
             O -= mol_abund[spec]*mol_abund._n_spec[spec]['O']
         mol_abund['O2']       = np.maximum(O / mol_abund._n_spec['O2']['O'], 0.)
 
@@ -344,7 +346,7 @@ class ChemExtended(object):
         n_S_ice = 2e-8 * rho / (self._mu*m_H)
         k_S  = S_chem_fudge * n_S_ice * self.grain_surface_H(T, n_d, n_ice)
         k_CR = self.UMISTformat_CR(T, self._zetaCR, 0, 2.4)
-        ice_abund_H = k_CR/k_S * n_H2
+        ice_abund_H = np.minimum(k_CR/k_S, 1) * n_H2
         # Define basic sinks                
         He_sinks = rho/m_H * (gas_abund['H2']/gas_abund.mass('H2')) * self.UMISTformat(T, 4e-14, 0, 0) + (self._mu * self._eta * n_d) * self.UMISTformat(T, 2.06e-4, 0, 0)              # Base level is H2 ionization and grain collisions
         OH_sinks = ice_abund_H * self.grain_surface_H(T, n_d, n_ice, 0, 17/18) + rho/m_H * (ice_abund['H2']/ice_abund.mass('H2')) * self.grain_surface_H2(T, n_d, n_ice, 2600, 34/19)   # Base level is H2O formation from H and H2
@@ -463,10 +465,18 @@ class ChemExtended(object):
                 reactants[reactants.index('OH')]='H2O'
                 weights_p[products.index('H2')]+=0.5
                 norm_rates[react] *= self.UMISTformat_CR(T, self._zetaCR, 0, 500)/OH_sinks
+            pve_rate = (norm_rates[react]>0)
             for r, w in zip(reactants, weights_r):
-                ice_abund[r] -= ice_abund.mass(r) * norm_rates[react] * w * dt
+                ice_abund[r][pve_rate] -= (ice_abund.mass(r) * norm_rates[react] * w * dt)[pve_rate]
+                if np.sum(np.isnan(ice_abund[r]))>0:
+                    print("ice r", react, r)
+                    raise Exception
             for p, w in zip(products, weights_p):
-                ice_abund[p] += ice_abund.mass(p) * norm_rates[react] * w * dt
+                ice_abund[p][pve_rate] += (ice_abund.mass(p) * norm_rates[react] * w * dt)[pve_rate]
+                if np.sum(np.isnan(ice_abund[r]))>0:
+                    print("ice p", react, p)
+                    raise Exception
+                
         # Gas phase
         for react, rate in zip(self._gas_reactions,self._gas_rates):
             reactants, products = react.replace(' ','').split('-->')
@@ -482,10 +492,17 @@ class ChemExtended(object):
             elif 'Hej' in reactants:
                 reactants[reactants.index('Hej')]='He'
                 norm_rates[react] *= 0.65*self._zetaCR/He_sinks
+            pve_rate = (norm_rates[react]>0)
             for r, w in zip(reactants, weights_r):
-                gas_abund[r] -= gas_abund.mass(r) * norm_rates[react] * w * dt
+                gas_abund[r][pve_rate] -= (gas_abund.mass(r) * norm_rates[react] * w * dt)[pve_rate]
+                if np.sum(np.isnan(gas_abund[r]))>0:
+                    print("gas r", react, r)
+                    raise Exception
             for p, w in zip(products, weights_p):
-                gas_abund[p] += gas_abund.mass(p) * norm_rates[react] * w * dt
+                gas_abund[p][pve_rate] += (gas_abund.mass(p) * norm_rates[react] * w * dt)[pve_rate]
+                if np.sum(np.isnan(gas_abund[r]))>0:
+                    print("gas p", react, p)
+                    raise Exception
 
         return ice_abund, gas_abund
         

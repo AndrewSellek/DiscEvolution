@@ -270,19 +270,21 @@ class ThermalChem(object):
         ## H2O: Smith et al. 2011, Table 2 (crystalline H2O)
         ## CO2: Edridge et al. 2013; Table 1 (pure, multilayer)
         ## CH3OH: Doronin et al. 2015; Fig 3b
-        ## CO, O2, CH4: Smith et al. 2016; Table 1 (multilayer)
+        ## CO, O2, CH4, N2: Smith et al. 2016; Table 1 (multilayer)
         ## C2H2, C2H4, C2H6: Behmard et al. 2019; Table 2 (pure, multilayer)
         ## OH - recommended value from Minssale review - for olivine (nb too reactive to measure on c-ASW)
         ## H2 - recommended value from Minssale review - for c-ASW
+        ## NH3 - Kruczkiewicz et al. 2021
+        ## H2O2 - Yan & Chu 2011 (preprint only)
         self._Tbind =  {'c-ASW':    {'H2O' : 5705., 'O2' : 1107., 'CO2' : 3196., 'CO' : 1390., 'CH3OH' : 6621., 'CH4': 1232.},
                         'silicate': {'H2O' : 5755., 'O2' : 1385., 'CO2' : 3738., 'CO' : 1365., 'CH3OH' : np.nan, 'CH4': np.nan},
                         'graphite': {'H2O' : 5792., 'O2' : 1522., 'CO2' : 3243., 'CO' : 1631., 'CH3OH' : 5728., 'CH4': 1593.},
-                        'pure':     {'H2O' : 6722., 'O2' : 1030., 'CO2' : 2980., 'CO' :  910., 'CH3OH' : 4850., 'CH4': 1190., 'C2H2': 2800., 'C2H4': 2200., 'C2H6': 2600., 'OH': 5698., 'H2': 371., 'N2': 870., 'NH3': 3070.}}
+                        'pure':     {'H2O' : 6722., 'O2' : 1030., 'CO2' : 2980., 'CO' :  910., 'CH3OH' : 4850., 'CH4': 1190., 'C2H2': 2800., 'C2H4': 2200., 'C2H6': 2600., 'OH': 5698., 'H2': 371., 'N2': 870., 'NH3': 3070., 'H2O2': 7450}}
                        
         self._nu_pre = {'c-ASW':    {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 6.81e16, 'CO' : 9.14e14, 'CH3OH' : 3.18e17, 'CH4': 5.43e13},
                         'silicate': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
                         'graphite': {'H2O' : 4.96e15, 'O2' : 5.98e14, 'CO2' : 7.43e16, 'CO' : 1.23e15, 'CH3OH' : 5.17e17, 'CH4': 1.04e14},
-                        'pure':     {'H2O' : 1.3e18,  'O2' : 3.2e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14, 'C2H2': 3e16, 'C2H4': 4e15, 'C2H6': 6e16, 'OH': 3.76e15, 'H2': 1.98e11, 'N2': 4.3e14, 'NH3': 1.0e13}}
+                        'pure':     {'H2O' : 1.3e18,  'O2' : 3.2e14,  'CO2' : 1.1e15,  'CO' : 4.1e13,  'CH3OH' : 5.0e14,  'CH4': 2.5e14, 'C2H2': 3e16, 'C2H4': 4e15, 'C2H6': 6e16, 'OH': 3.76e15, 'H2': 1.98e11, 'N2': 4.3e14, 'NH3': 1.0e13, 'H2O2': 1.0e11}}
                         
         # Number of dust grains per hydrogen nucleus, eta:
         m_g = 4*np.pi * rho_s * a**3 / 3
@@ -506,16 +508,16 @@ class nonThermalChem(object):
 
         # CR Spot heating - Dartois+ (2021)
         ## Molecules not included in study assumed to have same propertiesa as similarly volatile species 
-        self._alpha_spot = {'CO': 40.1, 'CO2': 21.9, 'H2O': 3.63, 'CH4': 40.1, 'O2': 40.1, 'H2': 40.1, 'N2': 40.1, 'C2H2': 21.9, 'C2H4': 21.9, 'C2H6': 21.9, 'NH3': 21.9, 'CH3OH': 3.63, 'OH': 3.63}
-        self._beta_spot  = {'CO': 75.8, 'CO2': 56.3, 'H2O': 3.25, 'CH4': 75.8, 'O2': 75.8, 'H2': 75.8, 'N2': 75.8, 'C2H2': 56.3, 'C2H4': 56.3, 'C2H6': 56.3, 'NH3': 56.3, 'CH3OH': 3.25, 'OH': 3.25}
-        self._gamma_spot = {'CO': 0.69, 'CO2': 0.60, 'H2O': 0.57, 'CH4': 0.69, 'O2': 0.69, 'H2': 0.69, 'N2': 0.69, 'C2H2': 0.60, 'C2H4': 0.60, 'C2H6': 0.60, 'NH3': 0.60, 'CH3OH': 0.57, 'OH': 0.57}
+        self._alpha_spot = {'CO': 40.1, 'CO2': 21.9, 'H2O': 3.63, 'CH4': 40.1, 'O2': 40.1, 'H2': 40.1, 'N2': 40.1, 'C2H2': 21.9, 'C2H4': 21.9, 'C2H6': 21.9, 'NH3': 21.9, 'CH3OH': 3.63, 'OH': 3.63, 'H2O2': 3.63}
+        self._beta_spot  = {'CO': 75.8, 'CO2': 56.3, 'H2O': 3.25, 'CH4': 75.8, 'O2': 75.8, 'H2': 75.8, 'N2': 75.8, 'C2H2': 56.3, 'C2H4': 56.3, 'C2H6': 56.3, 'NH3': 56.3, 'CH3OH': 3.25, 'OH': 3.25, 'H2O2': 3.25}
+        self._gamma_spot = {'CO': 0.69, 'CO2': 0.60, 'H2O': 0.57, 'CH4': 0.69, 'O2': 0.69, 'H2': 0.69, 'N2': 0.69, 'C2H2': 0.60, 'C2H4': 0.60, 'C2H6': 0.60, 'NH3': 0.60, 'CH3OH': 0.57, 'OH': 0.57, 'H2O2': 0.57}
         if CR_desorb:
             self._f_CRs = (1/Omega0) * np.pi*a**2 * self._eta * (self._flux_CR/3e-17)
         else:
             self._f_CRs = 0.0
 
         # UV photodesorption
-        self._yield_UV = {'CO': 1.2e-2, 'H2O': 6.1e-4, 'CH4': 1.2e-2/10, 'O2': 1.2e-2/10, 'H2': 1.2e-2/10, 'N2': 1.2e-2/10, 'CO2': 1.2e-2/3, 'C2H2': 1.2e-2/3, 'C2H4': 1.2e-2/3, 'C2H6': 1.2e-2/3, 'NH3': 1.2e-2/3, 'CH3OH': 6.1e-4, 'OH': 6.1e-4}
+        self._yield_UV = {'CO': 1.2e-2, 'H2O': 6.1e-4, 'CH4': 1.2e-2/10, 'O2': 1.2e-2/10, 'H2': 1.2e-2/10, 'N2': 1.2e-2/10, 'CO2': 1.2e-2/3, 'C2H2': 1.2e-2/3, 'C2H4': 1.2e-2/3, 'C2H6': 1.2e-2/3, 'NH3': 1.2e-2/3, 'CH3OH': 6.1e-4, 'OH': 6.1e-4, 'H2O2': 6.1e-4}
         if UV_desorb:
             self._f_UV = (1/Omega0) * np.pi*a**2 * self._eta
         else:
