@@ -260,7 +260,7 @@ def setup_init_abund_simple(model, disc):
     if model['chemistry']['type']=="Kalyaan":
         X_atom = SimpleH2OAtomAbund(model['grid']['N'])
         X_atom.set_Kalyaan_abundances()
-    elif model['chemistry']['type']=="MINDS" or model['chemistry']['type']=="Extended" or model['chemistry']['type']=="C2H2form":
+    elif model['chemistry']['type']=="Extended" or model['chemistry']['type']=="MINDS" or model['chemistry']['type']=="SimpleConversion" or model['chemistry']['type']=="C2H2form":
         X_atom = SimpleAtomAbund(model['grid']['N'])
         X_atom.set_adopted_abundances()
     else:
@@ -315,10 +315,15 @@ def get_simple_chemistry_model(model):
         nonThermal_dict['Mstar']        = model['star']['mass']
       
     # Reactions  
-    if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
+    if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile'] and 'zetaCR' in model['chemistry'].keys():
         ratesFile = model['chemistry']['ratesFile']
+        zetaCR = model['chemistry']['zetaCR']
+    elif 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
+        ratesFile = model['chemistry']['ratesFile']
+        zetaCR = 1.30e-17
     else:
         ratesFile = None
+        zetaCR = 1.30e-17
     
     if chem_type == 'TimeDep':
         chemistry = TimeDepCNOChemOberg(a=grain_size)
@@ -330,10 +335,10 @@ def get_simple_chemistry_model(model):
         chemistry = EquilibriumH2OChemKalyaan(fix_ratios=True, a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'NoReact':
         chemistry = EquilibriumCNOChemOberg(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
-    elif chem_type == 'MINDS' or chem_type == 'Extended':
+    elif chem_type == 'Extended' or chem_type == 'MINDS':
         chemistry = EquilibriumChemExtended(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
-    elif chem_type == 'C2H2form':
-        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile)
+    elif chem_type == 'SimpleConversion' or chem_type == 'C2H2form':
+        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, zetaCR=zetaCR)
     else:
         raise ValueError("Unknown chemical model type")
 
