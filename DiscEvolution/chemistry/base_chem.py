@@ -388,6 +388,9 @@ class ThermalChem(object):
             X_eq = X_t * Sa/(Sa + Sr + 1e-300)
             return X_eq * m_mol / self._mu * (dust_frac>0)    # Mask to ensure that ice can't spontaneously generate without dust to nucleate on
             """
+        elif spec=='C2H':
+            ## Binding energy unavailable - assume always gaseous
+            return 0.
         else:
             ## Usual adsorption/desorption balance
             # Desorption parameters
@@ -508,16 +511,16 @@ class nonThermalChem(object):
 
         # CR Spot heating - Dartois+ (2021)
         ## Molecules not included in study assumed to have same propertiesa as similarly volatile species 
-        self._alpha_spot = {'CO': 40.1, 'CO2': 21.9, 'H2O': 3.63, 'CH4': 40.1, 'O2': 40.1, 'H2': 40.1, 'N2': 40.1, 'C2H2': 21.9, 'C2H4': 21.9, 'C2H6': 21.9, 'NH3': 21.9, 'CH3OH': 3.63, 'OH': 3.63, 'H2O2': 3.63}
-        self._beta_spot  = {'CO': 75.8, 'CO2': 56.3, 'H2O': 3.25, 'CH4': 75.8, 'O2': 75.8, 'H2': 75.8, 'N2': 75.8, 'C2H2': 56.3, 'C2H4': 56.3, 'C2H6': 56.3, 'NH3': 56.3, 'CH3OH': 3.25, 'OH': 3.25, 'H2O2': 3.25}
-        self._gamma_spot = {'CO': 0.69, 'CO2': 0.60, 'H2O': 0.57, 'CH4': 0.69, 'O2': 0.69, 'H2': 0.69, 'N2': 0.69, 'C2H2': 0.60, 'C2H4': 0.60, 'C2H6': 0.60, 'NH3': 0.60, 'CH3OH': 0.57, 'OH': 0.57, 'H2O2': 0.57}
+        self._alpha_spot = {'CO': 40.1, 'CO2': 21.9, 'H2O': 3.63, 'CH4': 40.1, 'O2': 40.1, 'H2': 40.1, 'N2': 40.1, 'C2H2': 21.9, 'C2H4': 21.9, 'C2H6': 21.9, 'C2H': 21.9, 'NH3': 21.9, 'CH3OH': 3.63, 'OH': 3.63, 'H2O2': 3.63}
+        self._beta_spot  = {'CO': 75.8, 'CO2': 56.3, 'H2O': 3.25, 'CH4': 75.8, 'O2': 75.8, 'H2': 75.8, 'N2': 75.8, 'C2H2': 56.3, 'C2H4': 56.3, 'C2H6': 56.3, 'C2H': 56.3, 'NH3': 56.3, 'CH3OH': 3.25, 'OH': 3.25, 'H2O2': 3.25}
+        self._gamma_spot = {'CO': 0.69, 'CO2': 0.60, 'H2O': 0.57, 'CH4': 0.69, 'O2': 0.69, 'H2': 0.69, 'N2': 0.69, 'C2H2': 0.60, 'C2H4': 0.60, 'C2H6': 0.60, 'C2H': 0.60, 'NH3': 0.60, 'CH3OH': 0.57, 'OH': 0.57, 'H2O2': 0.57}
         if CR_desorb:
             self._f_CRs = (1/Omega0) * np.pi*a**2 * self._eta * (self._flux_CR/3e-17)
         else:
             self._f_CRs = 0.0
 
         # UV photodesorption
-        self._yield_UV = {'CO': 1.2e-2, 'H2O': 6.1e-4, 'CH4': 1.2e-2/10, 'O2': 1.2e-2/10, 'H2': 1.2e-2/10, 'N2': 1.2e-2/10, 'CO2': 1.2e-2/3, 'C2H2': 1.2e-2/3, 'C2H4': 1.2e-2/3, 'C2H6': 1.2e-2/3, 'NH3': 1.2e-2/3, 'CH3OH': 6.1e-4, 'OH': 6.1e-4, 'H2O2': 6.1e-4}
+        self._yield_UV = {'CO': 1.2e-2, 'H2O': 6.1e-4, 'CH4': 1.2e-2/10, 'O2': 1.2e-2/10, 'H2': 1.2e-2/10, 'N2': 1.2e-2/10, 'CO2': 1.2e-2/3, 'C2H2': 1.2e-2/3, 'C2H4': 1.2e-2/3, 'C2H6': 1.2e-2/3, 'C2H': 1.2e-2/3, 'NH3': 1.2e-2/3, 'CH3OH': 6.1e-4, 'OH': 6.1e-4, 'H2O2': 6.1e-4}
         if UV_desorb:
             self._f_UV = (1/Omega0) * np.pi*a**2 * self._eta
         else:
@@ -562,6 +565,9 @@ class nonThermalChem(object):
             return 0.
         elif spec=='H' or spec=='H2':
             ## Not tracking
+            return 0.
+        elif spec=='C2H':
+            ## Binding energy unavailable - assume always gaseous
             return 0.
         else:
             ## Usual adsorption/desorption balance

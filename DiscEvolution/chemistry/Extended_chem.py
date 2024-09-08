@@ -100,16 +100,16 @@ class SimpleMolAbund(ChemicalAbund):
     def __init__(self, *sizes):
         mol_ids = ['Si-grain', 'C-grain',
                    #'S-grain',
-                   'H2O', 'O2', 'H2O2',
+                   'H2O', 'O2', #'H2O2',
                    #'NH3', 'N2',
-                   'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2', 'C2H4', 'C2H6',
+                   'CO2', 'CO', 'CH3OH', 'CH4', 'C2H2', 'C2H4', 'C2H6', 'C2H',
                    'H',
                    'H2','He']
         mol_mass = [76., 12.,
                     #32.,
-                    18., 32., 34.,
+                    18., 32., #34.,
                     #17., 28.,
-                    44., 28., 32., 16., 26., 28., 30.,
+                    44., 28., 32., 16., 26., 28., 30., 25.,
                     1.,
                     2., 4.]
 
@@ -122,7 +122,7 @@ class SimpleMolAbund(ChemicalAbund):
                         #'S-grain': {'S': 1, },
                         'H2O': {'O': 1, 'H': 2, },
                         'O2': {'O': 2, },
-                        'H2O2': {'O': 2, 'H': 2, },
+                        #'H2O2': {'O': 2, 'H': 2, },
                         #'NH3': {'N': 1, 'H': 3, },
                         #'N2': {'N': 2, },
                         'CO2': {'C': 1, 'O': 2, },
@@ -132,6 +132,7 @@ class SimpleMolAbund(ChemicalAbund):
                         'C2H2': {'C': 2, 'H': 2, },
                         'C2H4': {'C': 2, 'H': 4, },
                         'C2H6': {'C': 2, 'H': 6, },
+                        'C2H': {'C': 2, 'H': 1, },
                         'H': {'H': 1, },
                         'H2': {'H': 2, },
                         'He': {'He': 1, },
@@ -273,7 +274,8 @@ class ChemExtended(object):
         mol_abund['C2H2']     = 0.00 * C
         mol_abund['C2H4']     = 0.00 * C
         mol_abund['C2H6']     = 0.00 * C
-        for spec in ['CO2','CO','CH3OH','CH4','C2H2','C2H4','C2H6']:
+        mol_abund['C2H']      = 0.00 * C
+        for spec in ['CO2','CO','CH3OH','CH4','C2H2','C2H4','C2H6','C2H']:
             C -= mol_abund[spec]*mol_abund._n_spec[spec]['C']
         mol_abund['C-grain']  = np.maximum(C / mol_abund._n_spec['C-grain']['C'], 0.)
 
@@ -285,8 +287,8 @@ class ChemExtended(object):
 
         # Assign O budget; water is 20%, any remainder goes into O2
         mol_abund['H2O']      = 0.20 * O
-        mol_abund['H2O2']     = 0.00 * O
-        for spec in ['Si-grain','H2O','CO2','CO','CH3OH','H2O2']:
+        #mol_abund['H2O2']     = 0.00 * O
+        for spec in ['Si-grain','H2O','CO2','CO','CH3OH']:  #,'H2O2'
             O -= mol_abund[spec]*mol_abund._n_spec[spec]['O']
         mol_abund['O2']       = np.maximum(O / mol_abund._n_spec['O2']['O'], 0.)
 
@@ -535,9 +537,9 @@ class ChemExtended(object):
 # Combined Models
 ###############################################################################
 class EquilibriumChemExtended(ChemExtended, EquilibriumChem):
-    def __init__(self, fix_ratios=True, ratesFile=None, **kwargs):
+    def __init__(self, fix_ratios=True, ratesFile=None, zetaCR=1.30e-17, **kwargs):
         #assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
-        ChemExtended.__init__(self, ratesFile)
+        ChemExtended.__init__(self, ratesFile, zetaCR)
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
 class TimeDepChemExtended(ChemExtended, TimeDependentChem):
