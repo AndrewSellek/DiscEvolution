@@ -314,17 +314,24 @@ def get_simple_chemistry_model(model):
         nonThermal_dict['X_desorb']     = model['chemistry']['X_desorb']
         nonThermal_dict['Mstar']        = model['star']['mass']
       
-    # Reactions  
-    if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile'] and 'zetaCR' in model['chemistry'].keys():
+    # Reactions
+    if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile'] and 'zetaCR' in model['chemistry'].keys() and 'barrier' in model['chemistry'].keys():
         ratesFile = model['chemistry']['ratesFile']
         zetaCR = model['chemistry']['zetaCR']
+        barrier = model['chemistry']['barrier']
+    elif 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile'] and 'zetaCR' in model['chemistry'].keys():
+        ratesFile = model['chemistry']['ratesFile']
+        zetaCR = model['chemistry']['zetaCR']
+        barrier = 1e-8
     elif 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
         ratesFile = model['chemistry']['ratesFile']
         zetaCR = 1.30e-17
+        barrier = 1e-8
     else:
         ratesFile = None
         zetaCR = 1.30e-17
-    
+        barrier = 1e-8
+
     if chem_type == 'TimeDep':
         chemistry = TimeDepCNOChemOberg(a=grain_size)
     elif chem_type == 'Madhu':
@@ -338,7 +345,7 @@ def get_simple_chemistry_model(model):
     elif chem_type == 'Extended' or chem_type == 'MINDS':
         chemistry = EquilibriumChemExtended(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'SimpleConversion' or chem_type == 'C2H2form':
-        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, zetaCR=zetaCR)
+        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, zetaCR=zetaCR, barrier=barrier)
     else:
         raise ValueError("Unknown chemical model type")
 

@@ -220,7 +220,7 @@ def get_simple_chemistry_model(model):
     else:
         ratesFile = None
 
-    chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, ratesFile=ratesFile)
+    chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, ratesFile=ratesFile, zetaCR=zetaCR, barrier=barrier)
 
     return chemistry
 

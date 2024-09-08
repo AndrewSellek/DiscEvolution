@@ -164,10 +164,10 @@ class ChemExtended(object):
         fix_NH3    : Whether to fix the nitrogen abundance when recomputing the
                      molecular abundances
     """
-    def __init__(self, ratesFile=None, zetaCR=1.30e-17):
+    def __init__(self, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8):
         """Initialisation of reactions""" 
         self._zetaCR = zetaCR
-        self._atunnel = 1.0e-8
+        self._atunnel = barrier
         self._fdiff = 0.3
         self._gas_reactions = []
         self._gas_rates     = []
@@ -537,9 +537,9 @@ class ChemExtended(object):
 # Combined Models
 ###############################################################################
 class EquilibriumChemExtended(ChemExtended, EquilibriumChem):
-    def __init__(self, fix_ratios=True, ratesFile=None, zetaCR=1.30e-17, **kwargs):
+    def __init__(self, fix_ratios=True, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, **kwargs):
         #assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
-        ChemExtended.__init__(self, ratesFile, zetaCR)
+        ChemExtended.__init__(self, ratesFile, zetaCR, barrier)
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
 class TimeDepChemExtended(ChemExtended, TimeDependentChem):
