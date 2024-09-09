@@ -281,6 +281,9 @@ def setup_init_abund_simple(model, disc):
                                           disc.Sigma_G,
                                           X_atom)
         disc.initialize_dust_density(chem.ice.total_abund)
+        if not chemistry._O2ice:
+            chem.ice['H2O']+=chem.ice['O2']
+            chem.ice['O2']=0.0
     print("Resulting gas phase mu: {}-{}".format(min(chem.gas.mu()),max(chem.gas.mu())))
     print("Resulting ice phase mu: {}-{}".format(min(chem.ice.mu()),max(chem.ice.mu())))
         
@@ -315,22 +318,13 @@ def get_simple_chemistry_model(model):
         nonThermal_dict['Mstar']        = model['star']['mass']
       
     # Reactions
-    if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile'] and 'zetaCR' in model['chemistry'].keys() and 'barrier' in model['chemistry'].keys():
+    ratesFile = None
+    if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
         ratesFile = model['chemistry']['ratesFile']
-        zetaCR = model['chemistry']['zetaCR']
-        barrier = model['chemistry']['barrier']
-    elif 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile'] and 'zetaCR' in model['chemistry'].keys():
-        ratesFile = model['chemistry']['ratesFile']
-        zetaCR = model['chemistry']['zetaCR']
-        barrier = 1e-8
-    elif 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
-        ratesFile = model['chemistry']['ratesFile']
-        zetaCR = 1.30e-17
-        barrier = 1e-8
-    else:
-        ratesFile = None
-        zetaCR = 1.30e-17
-        barrier = 1e-8
+        rateKwargs = {'zetaCR': 1.30e-17, 'barrier': 1e-8, 'O2ice': True, 'instantO2hydrogenation': False}
+        for paramName in rateKwargs.keys():
+            if paramName in model['chemistry'].keys():
+                rateKwargs[paramName] = model['chemistry'][paramName]
 
     if chem_type == 'TimeDep':
         chemistry = TimeDepCNOChemOberg(a=grain_size)
@@ -345,7 +339,7 @@ def get_simple_chemistry_model(model):
     elif chem_type == 'Extended' or chem_type == 'MINDS':
         chemistry = EquilibriumChemExtended(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'SimpleConversion' or chem_type == 'C2H2form':
-        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, zetaCR=zetaCR, barrier=barrier)
+        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, **rateKwargs)
     else:
         raise ValueError("Unknown chemical model type")
 
