@@ -319,6 +319,7 @@ def get_simple_chemistry_model(model):
       
     # Reactions
     ratesFile = None
+    rateKwargs = {}
     if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
         ratesFile = model['chemistry']['ratesFile']
         rateKwargs = {'zetaCR': 1.30e-17, 'barrier': 1e-8, 'O2ice': True, 'instantO2hydrogenation': False}
