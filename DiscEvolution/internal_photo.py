@@ -18,12 +18,12 @@ class NotHoleError(Exception):
     pass
 
 class PhotoBase():
-    def __init__(self, disc, Regime=None, Type=None):
+    def __init__(self, disc, Regime=None, Type=None, Mdot=None):
         # Basic mass loss properties
         self._regime = Regime   # EUV or X-ray
         self._type   = Type     # 'Primordial' or 'InnerHole'
         self._Sigmadot = np.zeros_like(disc.R)
-        self.mdot_XE(disc.star)
+        self.mdot_XE(disc.star, Mdot=Mdot)
 
         # Evolutionary state flags
         self._Hole  = False     # Has the hole started to open?
@@ -259,8 +259,8 @@ X-ray dominated photoevaporation
 #################################################################################
 """Owen, Ercolano and Clarke (2012)"""
 class XrayDiscOwen(PhotoBase):
-    def __init__(self, disc, Type='Primordial', R_hole=None):
-        super().__init__(disc, Regime='X-ray', Type=Type)
+    def __init__(self, disc, Type='Primordial', R_hole=None, Mdot=None):
+        super().__init__(disc, Regime='X-ray', Type=Type, Mdot=Mdot)
 
         # Parameters for Primordial mass loss profile
         self._a1 = 0.15138
@@ -387,8 +387,8 @@ class XrayDiscOwen(PhotoBase):
 
 """Picogna, Ercolano, Owen and Weber (2019)"""
 class XrayDiscPicogna(PhotoBase):
-    def __init__(self, disc, Type='Primordial', R_hole=None):
-        super().__init__(disc, Regime='X-ray', Type=Type)
+    def __init__(self, disc, Type='Primordial', R_hole=None, Mdot=None):
+        super().__init__(disc, Regime='X-ray', Type=Type, Mdot=Mdot)
 
         # Parameters for Primordial mass loss profile
         self._a1 = -0.5885
@@ -516,8 +516,8 @@ class XrayDiscPicogna(PhotoBase):
 """Ercolano, Picogna, Monsch, Drake and Preibisch (2021)"""
 """Includes parameters to recreate their tests following Picogna et al. 2019"""
 class XrayDiscErcolano(PhotoBase):
-    def __init__(self, disc, Type='Primordial', R_hole=None, P19=False):
-        super().__init__(disc, Regime='X-ray', Type=Type)
+    def __init__(self, disc, Type='Primordial', R_hole=None, P19=False, Mdot=None):
+        super().__init__(disc, Regime='X-ray', Type=Type, Mdot=Mdot)
         # Luminosity parameters
         if P19:
             self._spec = 'P19'
@@ -625,8 +625,8 @@ class XrayDiscErcolano(PhotoBase):
 
 """Picogna, Ercolano and Espaillat (2021)"""
 class XrayDiscPicogna21(PhotoBase):
-    def __init__(self, disc, Type='Primordial', R_hole=None, P19=False):
-        super().__init__(disc, Regime='X-ray', Type=Type)
+    def __init__(self, disc, Type='Primordial', R_hole=None, P19=False, Mdot=None):
+        super().__init__(disc, Regime='X-ray', Type=Type, Mdot=Mdot)
 
         # Parameters for Primordial mass loss profile
         self._a1 = {0.1: -3.8337, 0.3:  -1.3206, 0.5: -1.2320, 1.0: -0.6344}
@@ -692,6 +692,109 @@ class XrayDiscPicogna21(PhotoBase):
 
         # Second term
         terms = 6*self._a1[star.M]*log10x**5 + 5*self._b1[star.M]*log10x**4 + 4*self._c1[star.M]*log10x**3 + 3*self._d1[star.M]*log10x**2 + 2*self._e1[star.M]*log10x + self._f1[star.M]
+        t2 = terms/(2*np.pi*x[where_photoevap]**2)
+
+        # Cut-off
+        #t3 = np.exp(-np.power(x[where_photoevap]/self._Rcut[star.M],10))
+
+        # Combine terms
+        Sigmadot[where_photoevap] = t1 * t2 #* t3
+        Sigmadot = np.maximum(Sigmadot,0)
+
+        # Work out total mass loss rate for normalisation
+        M_dot = 2*np.pi * R * Sigmadot
+        total = np.trapz(M_dot,R)
+
+        # Normalise, convert to cgs
+        Sigmadot *= self.Mdot / total * Msun / AU**2 # in g cm^-2 / yr
+
+        if ret:
+            # Return unaveraged values at cell edges
+            return Sigmadot
+        else:
+            # Store values as average of mass loss rate at cell edges
+            self._Sigmadot = (Sigmadot[1:] + Sigmadot[:-1]) / 2
+
+    def Sigma_dot_InnerHole(self, R, star, ret=False):
+        # Not provided
+        # Keep using the primordial one
+        return self.Sigma_dot_Primordial(R, star, ret=ret)
+
+"""Sellek et al. (2024b)"""
+class XrayDiscSellek24(PhotoBase):
+    def __init__(self, disc, Type='Primordial', R_hole=None, P19=False, Mdot=None):
+        super().__init__(disc, Regime='X-ray', Type=Type, Mdot=Mdot)
+
+        # Parameters for Primordial mass loss profile
+        self._a1 = {1.0: -1.2108}
+        self._b1 = {1.0:  9.6815}
+        self._c1 = {1.0:-31.226}
+        self._d1 = {1.0: 52.293}
+        self._e1 = {1.0:-48.475}
+        self._f1 = {1.0: 25.093}
+        self._g1 = {1.0:-7.6443}
+        print("WARNING, haven't implemented a cut-off")
+
+        # If initiating with an Inner Hole disc, need to update properties
+        if self._type == 'InnerHole':
+            raise NotImplementedError
+            self._Hole = True
+            self._R_hole = R_hole
+            #self.get_Rhole(disc)
+
+        # Run the mass loss rates to update the table
+        self.Sigma_dot(disc.R_edge, disc.star)
+
+    def mdot_XE(self, star, Mdot=None):
+        # In Msun/yr
+        if Mdot is not None:
+            self._Mdot = Mdot
+        elif self._type is not None:
+            self._Mdot = 4.3178e-9 * star.M   # Equation 5
+        else:
+            raise NotImplementedError("Disc is of unrecognised type, and no mass-loss rate has been manually specified")
+        self._Mdot_true = self._Mdot
+
+    def scaled_R(self, R, star):
+        # Where R in AU
+        # All are divided by stellar mass normalised to 1.0 Msun (value used by Sellek+24) to represent rescaling by gravitational radius 
+        x = R / (star.M/1.0)
+        if self._Hole:
+            y = (R-self._R_hole) / (star.M/1.0)    # Equation B6
+        else:
+            y = R / (star.M/1.0)
+        return x, y
+
+    def R_inner(self, star):
+        # Innermost mass loss
+        if self._type=='Primordial':
+            return 0                # Mass loss possible throughout
+        elif self._type=='InnerHole':
+            return self._R_hole     # Mass loss profile applies outside hole
+        else:
+            return 0                # If unspecified, assume mass loss possible throughout 
+
+    def Sigma_dot_Primordial(self, R, star, ret=False):
+        # Equation 6
+        Sigmadot = np.zeros_like(R)
+        x, y = self.scaled_R(R,star)
+        where_photoevap = (x<=np.inf)       # No outer cut off given
+        logx = np.log(x[where_photoevap])
+        log10 = np.log(10)
+        log10x = logx/log10
+
+        # First term
+        try:
+            exponent = self._a1[star.M] * log10x**6 + self._b1[star.M] * log10x**5 + self._c1[star.M] * log10x**4 + self._d1[star.M] * log10x**3 + self._e1[star.M] * log10x**2 + self._f1[star.M] * log10x + self._g1[star.M]
+        except:
+            exponent = self._a1[1.0] * log10x**6 + self._b1[1.0] * log10x**5 + self._c1[1.0] * log10x**4 + self._d1[1.0] * log10x**3 + self._e1[1.0] * log10x**2 + self._f1[1.0] * log10x + self._g1[1.0]
+        t1 = 10**exponent
+
+        # Second term
+        try:
+            terms = 6*self._a1[star.M]*log10x**5 + 5*self._b1[star.M]*log10x**4 + 4*self._c1[star.M]*log10x**3 + 3*self._d1[star.M]*log10x**2 + 2*self._e1[star.M]*log10x + self._f1[star.M]
+        except:
+            terms = 6*self._a1[1.0]*log10x**5 + 5*self._b1[1.0]*log10x**4 + 4*self._c1[1.0]*log10x**3 + 3*self._d1[1.0]*log10x**2 + 2*self._e1[1.0]*log10x + self._f1[1.0]
         t2 = terms/(2*np.pi*x[where_photoevap]**2)
 
         # Cut-off
