@@ -23,7 +23,7 @@ from DiscEvolution.diffusion import TracerDiffusion
 from DiscEvolution.driver import DiscEvolutionDriver
 from DiscEvolution.io import Event_Controller, DiscReader
 from DiscEvolution.disc_utils import mkdir_p
-from DiscEvolution.internal_photo import EUVDiscAlexander, XrayDiscOwen, XrayDiscPicogna
+from DiscEvolution.internal_photo import EUVDiscAlexander, XrayDiscOwen, XrayDiscPicogna, XrayDiscPicogna21, XrayDiscSellek24
 from DiscEvolution.history import History
 from DiscEvolution.collapse import HuesoGuillot05
 import DiscEvolution.photoevaporation as photoevaporation
@@ -476,7 +476,11 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
                 photomodel = 'Picogna'
             InnerHole = internal_photo_type.startswith('InnerHole')
             if InnerHole:
-                if photomodel=='Picogna':
+                if photomodel=='Sellek':
+                    internal_photo = XrayDiscSellek24(disc,Type='InnerHole',R_hole=R_hole)
+                elif photomodel=='Picogna21':
+                    internal_photo = XrayDiscPicogna21(disc,Type='InnerHole',R_hole=R_hole)
+                elif photomodel=='Picogna':
                     internal_photo = XrayDiscPicogna(disc,Type='InnerHole',R_hole=R_hole)
                 elif photomodel=='Owen':
                     internal_photo = XrayDiscOwen(disc,Type='InnerHole',R_hole=R_hole)
@@ -484,7 +488,11 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
                     print("Photoevaporation Mode Unrecognised: Default to 'None'")
                     internal_photo = None
             else:
-                if photomodel=='Picogna':
+                if photomodel=='Sellek':
+                    internal_photo = XrayDiscSellek24(disc)
+                elif photomodel=='Picogna21':
+                    internal_photo = XrayDiscPicogna21(disc)
+                elif photomodel=='Picogna':
                     internal_photo = XrayDiscPicogna(disc)
                 elif photomodel=='Owen':
                     internal_photo = XrayDiscOwen(disc)
