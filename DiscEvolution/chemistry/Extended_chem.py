@@ -32,8 +32,8 @@ class SimpleAtomAbund(ChemicalAbund):
         self._data[:] = np.outer(m_abund, np.ones(self.size)) / self._muH
 
     def set_protosolar_abundances(self, muH=1.41):
-        """Protoolar mass fractions of C, N, O, Si and S (Asplund 2021; Table B.1)
-        Main difference, besides listing isotopes separately, is that all are adjsuted up by ~0.06 to account for atomic diffusion
+        """Protosolar mass fractions of C, N, O, Si and S (Asplund 2021; Table B.1)
+        Main difference, besides listing isotopes separately, is that all are adjusted up by ~0.06 to account for atomic diffusion
 
         args:
             muH : mean atomic mass, default = 1.41
@@ -347,6 +347,7 @@ class ChemExtended(object):
             nmol : array(3, N) molecular mass-densities
         """
         calc_dt = np.inf
+        N2buffer=True
         
         # Define 'densities' of refractories and ices
         n_d   = 0.
@@ -375,6 +376,9 @@ class ChemExtended(object):
         ice_abund_H = np.minimum(k_CR/k_S, 1) * n_H2
         # Define basic sinks                
         He_sinks = rho/m_H * (gas_abund['H2']/gas_abund.mass('H2')) * self.UMISTformat(T, 4e-14, 0, 0) + (self._mu * self._eta * n_d) * self.UMISTformat(T, 2.06e-4, 0, 0)              # Base level is H2 ionization and grain collisions
+        if 'N2' not in gas_abund.species and N2buffer:
+            # If no N2 in network, include here to buffer CO, else CH4 formation rate is essentially constant
+            He_sinks += rho/m_H * 0.93*5.4e-5 * (gas_abund['H2']/gas_abund.mass('H2')) * self.UMISTformat(T, 1.60e-9, 0, 0)
         OH_sinks = ice_abund_H * self.grain_surface_H(T, n_d, n_ice, 0, 17/18) + rho/m_H * (ice_abund['H2']/ice_abund.mass('H2')) * self.grain_surface_H2(T, n_d, n_ice, 2600, 34/19)   # Base level is H2O formation from H and H2
                 
         ## Store all rates before doing reactions
@@ -383,7 +387,7 @@ class ChemExtended(object):
         for react, rate in zip(self._ice_reactions,self._ice_rates):
             reactants, weights_r, products, weights_p = self.get_weights_reactants_products(react)
             if 'CR' in reactants:
-                krate = fsurf*self.UMISTformat_CR(T, zetaEff, *rate[1:])
+                krate = self.UMISTformat_CR(T, zetaEff, *rate[1:])#*fsurf
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
             elif "H" in reactants:

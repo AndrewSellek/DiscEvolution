@@ -233,7 +233,7 @@ class SimpleChemBase(object):
 
         if not self._fix_ratios:
             # Allow some chemical reactions
-            chem.ice, chem.gas = self.convert_molecular_abundance(T, SigmaG, rho, chem.ice, chem.gas, dt)
+            chem.ice, chem.gas = self.convert_molecular_abundance(T, rho, SigmaG, chem.ice, chem.gas, dt)
     
             # Redo freeze-out with new abundances
             chem.ice += chem.gas
