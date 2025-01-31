@@ -193,6 +193,9 @@ class ChemExtended(object):
                     alpha, beta, gamma = params
                     self._ice_reactions.append(reaction.replace("(s)",""))
                     self._ice_rates.append((float(alpha),float(beta),float(gamma)))
+                elif "(s)" in reaction and 'UV' in reaction:
+                    self._ice_reactions.append(reaction.replace("(s)",""))
+                    self._ice_rates.append(())
                 elif "(s)" in reaction:
                     spec1, spec2, Ebar = params
                     self._ice_reactions.append(reaction.replace("(s)",""))
@@ -248,6 +251,15 @@ class ChemExtended(object):
         hop_H2 = np.maximum( np.exp(-self._fdiff*H2bind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*2.*m_H*k_B*self._fdiff*H2bind )) )
         Prob_spec1_H2 = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
         return Cgr * Prob_spec1_H2 * nu_H2 * hop_H2
+        
+    def grain_photolysis(self, F_UV, NH2, d2g, grainSize):
+        sputterYield = 8e-4 # Alata+14/15, Anderson+17, Bosman+21
+        vol_per_C = 12*m_H/2.24
+        k_grain = 0.75*vol_per_C*sputterYield*F_UV/grainSize
+        tau_UV = 2.6e-21*d2g[0]*NH2 # Extinction in upper layers - assume small dust only
+        f_small = d2g[0]/d2g.sum(0) # Fraction in samll dust
+        f_exposed = (1-np.exp(-tau_UV))/tau_UV
+        return k_grain*f_small*f_exposed # rate per grain * fraction of grains that are vertically mixed * fraction vertically above tau=1
         
     def get_weights_reactants_products(self, react):
         if '-->' in react:
@@ -334,7 +346,7 @@ class ChemExtended(object):
             
         return mol_abund
         
-    def convert_molecular_abundance(self, T, rho, Sigma, ice_abund, gas_abund, dt):
+    def convert_molecular_abundance(self, T, rho, Sigma, ice_abund, gas_abund, F_UV, d2g, dt):
         """Compute the fractions of species present given total abundances
 
         args:
@@ -387,9 +399,13 @@ class ChemExtended(object):
         for react, rate in zip(self._ice_reactions,self._ice_rates):
             reactants, weights_r, products, weights_p = self.get_weights_reactants_products(react)
             if 'CR' in reactants:
-                krate = self.UMISTformat_CR(T, zetaEff, *rate[1:])#*fsurf
+                krate = self.UMISTformat_CR(T, zetaEff, *rate[1:])
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
+            elif 'C-grain' in reactants:
+                krate = self.grain_photolysis(F_UV, Sigma*gas_abund['H2']/(gas_abund.mass('H2')*m_H), d2g, 0.1e-4)
+                weights_r.pop(reactants.index('UV'))
+                reactants.pop(reactants.index('UV'))
             elif "H" in reactants:
                 krate = self.grain_surface_H(T, n_d, n_ice, rate[-1], ice_abund.reduced_mass(reactants[0],reactants[1]))
             elif "OH" in reactants:
@@ -434,6 +450,9 @@ class ChemExtended(object):
                 if 'CR' in reactants:
                     weights_r.pop(reactants.index('CR'))
                     reactants.pop(reactants.index('CR'))
+                elif 'C-grain' in reactants:
+                    weights_r.pop(reactants.index('UV'))
+                    reactants.pop(reactants.index('UV'))
                 elif "H" in reactants:
                     weights_r.pop(reactants.index('H'))
                     reactants.pop(reactants.index('H'))
@@ -464,6 +483,9 @@ class ChemExtended(object):
             if 'CR' in reactants:
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
+            elif 'C-grain' in reactants:
+                weights_r.pop(reactants.index('UV'))
+                reactants.pop(reactants.index('UV'))
             elif "H" in reactants:
                 weights_r[reactants.index('H')]/=2.0
                 reactants[reactants.index('H')]='H2'
@@ -528,8 +550,9 @@ class ChemExtended(object):
         tot_abund = ice_abund.copy()
         tot_abund += gas_abund.copy()
         self._mu = tot_abund.mu()
+        F_UV = disc.star.LFUV/(4*np.pi*(disc.R*AU)**2) * disc.angleFlare_FUV * 1e8/1.63e-3
         
-        dt = self.convert_molecular_abundance(T, rho, disc.Sigma_G, ice_abund, gas_abund, None)
+        dt = self.convert_molecular_abundance(T, rho, disc.Sigma_G, ice_abund, gas_abund, F_UV, disc.dust_frac, None)
                 
         return dt/np.e  # Add a factor of e to avoid going exactly to 0 in non-empty cells
         

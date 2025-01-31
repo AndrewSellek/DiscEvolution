@@ -8,7 +8,7 @@
 from __future__ import print_function
 import numpy as np
 import os
-from .constants import yr
+from .constants import yr, AU
 from . import io
 
 class DiscEvolutionDriver(object):
@@ -87,7 +87,7 @@ class DiscEvolutionDriver(object):
             if self._dust._diffuse:
                 dt = min(dt, self._dust._diffuse.max_timestep(self._disc))
         if self._diffusion:
-            dt = min(dt, self._diffusion.max_timestep(self._disc))       
+            dt = min(dt, self._diffusion.max_timestep(self._disc))
         if self._external_photo and hasattr(self._external_photo,"_density"): # If we are using density to calculate mass loss rates, we need to limit the time step based on photoevaporation
             (dM_dot, dM_gas) = self._external_photo.optically_thin_weighting(disc)
             Dt = dM_gas[(dM_dot>0)] / dM_dot[(dM_dot>0)]
@@ -161,9 +161,9 @@ class DiscEvolutionDriver(object):
             f_small[(eps==0.0)] = 0.0
             grain_size = disc.grain_size[-1]
             T = disc.T
+            F_UV = disc.star.LFUV/(4*np.pi*(disc.R*AU)**2) * disc.angleFlare_FUV * 1e8/1.63e-3
 
-            self._chemistry.update(dt, T, rho, eps, f_small, disc.R, disc.Sigma_G, disc.chem, 
-                                   grain_size=grain_size)
+            self._chemistry.update(dt, T, rho, eps, f_small, disc.R, disc.Sigma_G, disc.chem, F_UV, grain_size=grain_size)
 
             # Clean values
             disc.chem.gas.data[:] = np.maximum(disc.chem.gas.data, 0)   # Nonzero
@@ -187,8 +187,11 @@ class DiscEvolutionDriver(object):
             pass
 
         # Now we should update the auxillary properties, do grain growth etc
-        disc.update(dt)
-
+        if self._gas:
+            disc.update(dt, vvisc=self._gas.viscous_velocity(self.disc)[0])
+        else:
+            disc.update(dt)
+            
         self._t += dt
         self._nstep += 1
         return dt

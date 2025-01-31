@@ -126,7 +126,7 @@ def setup_disc(model):
         elif model['euv']['Phi'] > 0:
             star = PhotoStar(LX=0, Phi=model['euv']['Phi'], M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
         else:
-            star = SimpleStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
+            star = PhotoStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
     except KeyError:
         star = SimpleStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
 

@@ -11,6 +11,7 @@ from .constants import *
 from .disc import AccretionDisc
 from .reconstruction import DonorCell, VanLeer
 from scipy import interpolate
+from DiscEvolution.star import PhotoStar
 
 class DustyDisc(AccretionDisc):
     """Dusty accretion disc. Base class for an accretion disc that also
@@ -141,11 +142,14 @@ class DustyDisc(AccretionDisc):
         M_dust = np.sum(dM_dust)
         return M_dust
     
-    def update(self, dt):
+    def update(self, dt, vvisc=-0.):
         """Update the disc properties and age"""
 
         new_age = self._star.age + dt/(2*np.pi)
-        self._star.evolve(new_age)
+        if isinstance(self._star,PhotoStar):
+            self._star.evolve(new_age,self.Mdot(vvisc))
+        else:
+            self._star.evolve(new_age)
         self._eos.update(dt, self.Sigma, star=self._star, amax=self.grain_size[-1], G_0=self.FUV)
     
     def update_ices(self, chem):
@@ -474,9 +478,9 @@ class DustGrowthTwoPop(DustyDisc):
         self._eps[0] = dust_frac
 
 
-    def update(self, dt):
+    def update(self, dt, vvisc=-0.):
         """Do the standard disc update, and apply grain growth"""
-        super(DustGrowthTwoPop, self).update(dt)
+        super(DustGrowthTwoPop, self).update(dt, vvisc=vvisc)
         self.do_grain_growth(dt)
 
     @property

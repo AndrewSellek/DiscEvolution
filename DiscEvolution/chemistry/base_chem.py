@@ -218,7 +218,7 @@ class SimpleChemBase(object):
         return MolecularIceAbund(gas=gas, ice=ice)
 
 
-    def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, **kwargs):
+    def update(self, dt, T, rho, dust_frac, f_small, R, SigmaG, chem, F_UV, **kwargs):
         # Reportion gas and ice after drift or source/sink terms
         chem.ice += chem.gas
         chem.gas.data[:] = 0
@@ -233,7 +233,7 @@ class SimpleChemBase(object):
 
         if not self._fix_ratios:
             # Allow some chemical reactions
-            chem.ice, chem.gas = self.convert_molecular_abundance(T, rho, SigmaG, chem.ice, chem.gas, dt)
+            chem.ice, chem.gas = self.convert_molecular_abundance(T, rho, SigmaG, chem.ice, chem.gas, F_UV, dust_frac, dt)
     
             # Redo freeze-out with new abundances
             chem.ice += chem.gas

@@ -6,7 +6,8 @@
 # Contains stellar properties classes
 ################################################################################
 import numpy as np
-from .constants import Msun, Rsun, AU
+from .constants import Msun, Rsun, AU, hbar, k_B, yr, Omega0
+from scipy.integrate import quad
 
 # Base class for all stars, implements general properties that should be
 # common to all stars
@@ -144,10 +145,14 @@ class SimpleStar(StarBase):
                                      
 # A star with a photoevaporating luminosity
 class PhotoStar(SimpleStar):
-    def __init__(self, LX=1e30, Phi=0, **kwargs):
+    def __init__(self, LX=0, Phi=0, Tacc=12000, **kwargs):
         super().__init__(**kwargs)
         self._L_X = LX
         self._Phi = Phi
+        self._LFUV = 0
+        
+        hc_kT = 2*np.pi*hbar*2.9979e10/k_B/Tacc
+        self._facc_FUV = quad(self.Planck, hc_kT/2400e-8, hc_kT/912e-8)[0]/quad(self.Planck, 0, np.inf)[0]
 
     @property
     def L_X(self):
@@ -158,6 +163,29 @@ class PhotoStar(SimpleStar):
     def Phi(self):
         """EUV Photon Luminosity"""
         return self._Phi
+
+    @property
+    def LFUV(self):
+        """FUV Luminosity from Accretion"""
+        return self._LFUV
+        
+    def Planck(self, nu):
+        return nu**3/(np.exp(nu)-1)
+        
+    def Mdot_to_FUV(self, Mdot):
+        Lacc = 0.8*self.M*Msun/(self.Rs*Rsun)*6.674e-8*(Mdot*Msun/(yr/Omega0))
+        return self._facc_FUV*Lacc
+        
+    def evolve(self, age, Mdot, M=None):
+        """Update the stellar properties based on current age and mass
+
+        args:
+           age : stellar age in yr
+           M   : mass, Msun
+        """
+        self._age = age
+        if M is not None: self._M = M
+        self._LFUV = self.Mdot_to_FUV(Mdot)
 
 
 def from_file(filename):
