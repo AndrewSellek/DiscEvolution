@@ -256,8 +256,8 @@ class ChemExtended(object):
         sputterYield = 8e-4 # Alata+14/15, Anderson+17, Bosman+21
         vol_per_C = 12*m_H/2.24
         k_grain = 0.75*vol_per_C*sputterYield*F_UV/grainSize
-        tau_UV = 2.6e-21*d2g[0]*NH2 # Extinction in upper layers - assume small dust only
-        f_small = d2g[0]/d2g.sum(0) # Fraction in samll dust
+        tau_UV = 2.6e-21*(d2g[0]/0.01)*2*NH2 # Extinction in upper layers - assume small dust only
+        f_small = d2g[0]/d2g.sum(0) # Fraction in small dust
         f_exposed = (1-np.exp(-tau_UV))/tau_UV
         return k_grain*f_small*f_exposed # rate per grain * fraction of grains that are vertically mixed * fraction vertically above tau=1
         
