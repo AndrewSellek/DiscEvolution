@@ -224,28 +224,28 @@ class ChemExtended(object):
         return alpha * (T/300)**beta * gamma
         #return self._zetaCR * (T/300)**beta * gamma
 
-    def grain_surface(self, T, n_d, n_ice, spec1, spec2, Ebar):
+    def grain_surface(self, T, n_d, n_ice, spec1, spec2, Ebar, Nact=2):
         Nsites_tot = self._mu * self._etaNbind * n_d
-        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        Cgr = np.minimum(1, Nact**2*Nsites_tot**2/n_ice**2) / Nsites_tot
         nu1, nu2 = self._nu_pre['pure'][spec1], self._nu_pre['pure'][spec2]
         T1,  T2  = self._Tbind['pure'][spec1],  self._Tbind['pure'][spec2]
         Prob_spec1_spec2 = np.exp(-Ebar/T)
         return Cgr * Prob_spec1_spec2 * (nu1 * np.exp(-self._fdiff*T1/T) + nu2 * np.exp(-self._fdiff*T2/T))
 
-    def grain_surface_H(self, T, n_d, n_ice, Ebar = 860, mu=34/35):
+    def grain_surface_H(self, T, n_d, n_ice, Ebar = 860, mu=34/35, Nact=2):
         """Reaction rate with H on grain surfaces"""
         Nsites_tot = self._mu * self._etaNbind * n_d
-        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        Cgr = np.minimum(1, Nact**2*Nsites_tot**2/n_ice**2) / Nsites_tot
         nu_H  = 1.54e11     # ASW value in Minissale review
         Hbind = 450         # ASW value in Minissale review
         hop_H = np.maximum( np.exp(-self._fdiff*Hbind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*m_H*k_B*self._fdiff*Hbind )) )
         Prob_spec1_H = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
         return Cgr * Prob_spec1_H * nu_H * hop_H
         
-    def grain_surface_H2(self, T, n_d, n_ice, Ebar = 0, mu = 1):
+    def grain_surface_H2(self, T, n_d, n_ice, Ebar = 0, mu = 1, Nact=2):
         """Reaction rate with H2 on grain surfaces"""
         Nsites_tot = self._mu * self._etaNbind * n_d
-        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        Cgr = np.minimum(1, Nact**2*Nsites_tot**2/n_ice**2) / Nsites_tot
         nu_H2  = 1.98e11    # ASW value in Minissale review
         H2bind = 371        # ASW value in Minissale review
         hop_H2 = np.maximum( np.exp(-self._fdiff*H2bind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*2.*m_H*k_B*self._fdiff*H2bind )) )
