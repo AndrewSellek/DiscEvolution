@@ -116,7 +116,12 @@ def setup_disc(model):
 
     # Setup the grid
     p = model['grid']
-    grid = Grid(p['R0'], p['R1'], p['N'], spacing=p['spacing'])
+    refine=None
+    if p['spacing']=='naturalRefine' and model['perturbation']['Type']=="Gaussian":
+        refine = (model['perturbation']['Radius']*0.7,model['perturbation']['Radius']*1.3,2)
+    elif p['spacing']=='naturalRefine':
+        p['spacing']='natural'
+    grid = Grid(p['R0'], p['R1'], p['N'], spacing=p['spacing'], refine=refine)
 
     # Setup the star with photoionizing luminosity if provided and non-zero
     p = model['star']
@@ -249,22 +254,22 @@ def setup_disc(model):
             if model['chemistry']['type'] == 'krome':
                 raise NotImplementedError("Haven't configured krome chemistry in this version")
             else:
-                disc.chem = setup_init_abund_simple(model, disc)
+                disc.chem = setup_init_abund_simple(model, disc, grid.Ncells)
                 disc.update_ices(disc.chem.ice)
 
     return disc
 
 ###
-def setup_init_abund_simple(model, disc):
+def setup_init_abund_simple(model, disc, N):
     # Define abundances
     if model['chemistry']['type']=="Kalyaan":
-        X_atom = SimpleH2OAtomAbund(model['grid']['N'])
+        X_atom = SimpleH2OAtomAbund(N)
         X_atom.set_Kalyaan_abundances()
     elif model['chemistry']['type']=="Extended" or model['chemistry']['type']=="MINDS" or model['chemistry']['type']=="SimpleConversion" or model['chemistry']['type']=="C2H2form":
-        X_atom = SimpleAtomAbund(model['grid']['N'])
+        X_atom = SimpleAtomAbund(N)
         X_atom.set_adopted_abundances()
     else:
-        X_atom = SimpleCNOAtomAbund(model['grid']['N'])
+        X_atom = SimpleCNOAtomAbund(N)
         X_atom.set_solar_abundances()    
 
     # Put into a chemical model
