@@ -164,7 +164,7 @@ class ChemExtended(object):
         fix_NH3    : Whether to fix the nitrogen abundance when recomputing the
                      molecular abundances
     """
-    def __init__(self, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0):
+    def __init__(self, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0, dt_scale=np.e):
         """Initialisation of reactions"""
         self._zetaFloor_SLRs = 7.6e-19 # Umebayashi & Nakano (2009)
         self._zetaCR = zetaCR
@@ -178,6 +178,7 @@ class ChemExtended(object):
         self._ice_rates     = []
         self._O2ice = O2ice # Is there initially O2 ice?
         self._instantO2hydrogenation = instantO2hydrogenation   # Does O2 instantly hydrogenatise?
+        self._dt_scale = dt_scale
 
         if ratesFile is not None:
             for row in open(ratesFile):
@@ -554,15 +555,15 @@ class ChemExtended(object):
         
         dt = self.convert_molecular_abundance(T, rho, disc.Sigma_G, ice_abund, gas_abund, F_UV, disc.dust_frac, None)
                 
-        return dt/np.e  # Add a factor of e to avoid going exactly to 0 in non-empty cells
+        return dt/self._dt_scale  # Add a factor of e to avoid going exactly to 0 in non-empty cells
         
 ###############################################################################
 # Combined Models
 ###############################################################################
 class EquilibriumChemExtended(ChemExtended, EquilibriumChem):
-    def __init__(self, fix_ratios=True, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0, **kwargs):
+    def __init__(self, fix_ratios=True, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0, dt_scale=np.e, **kwargs):
         #assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
-        ChemExtended.__init__(self, ratesFile, zetaCR, barrier, O2ice, instantO2hydrogenation, scaleCRattenuation)
+        ChemExtended.__init__(self, ratesFile, zetaCR, barrier, O2ice, instantO2hydrogenation, scaleCRattenuation, dt_scale)
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
 class TimeDepChemExtended(ChemExtended, TimeDependentChem):
