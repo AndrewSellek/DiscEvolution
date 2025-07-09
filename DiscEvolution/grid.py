@@ -11,7 +11,7 @@ import numpy as np
 
 class Grid(object):
     """Construct a simple 1D grid with different spacings"""
-    def __init__(self, R0, R1, N, spacing='log'):
+    def __init__(self, R0, R1, N, spacing='log', refine=None):
 
         if spacing == 'log':
             self._setup_log(R0, R1, N)
@@ -19,6 +19,8 @@ class Grid(object):
             self._setup_powerlaw(R0, R1, N, 1.0)
         elif spacing == 'natural':
             self._setup_powerlaw(R0, R1, N, 0.5)
+        elif spacing == 'naturalRefine':
+            self._refine_powerlaw(R0, R1, N, 0.5, refine)
         else:
             try:
                 self._setup_powerlaw(R0, R1, N, float(spacing))
@@ -26,7 +28,7 @@ class Grid(object):
                 raise AttributeError("Spacing must be a power law index, or "
                                      "one of 'log', 'linear' and 'natural'")
         self._setup_aux()
-        self._N = N
+        self._N = len(self._Rc)
 
         self._R0 = R0
         self._R1 = R1
@@ -68,7 +70,43 @@ class Grid(object):
         self._Rc  = Rce[1:-1]
 
         self._Ree = Ree
-        
+
+    def _refine_powerlaw(self, R0, R1, N, alpha, refine):
+        """Setup a power law grid with refinement region"""
+        # Refine = (inner radius, outer radius, increase in resolution)
+        alpha = float(alpha)
+        alpha1 = 1/alpha
+        R0a = R0**alpha
+        R1a = R1**alpha
+        dRa = (R1a - R0a) / N
+
+        # Coarse grid
+        Ree_a = R0a + np.arange(-2, N+3, dtype='f8') * dRa  # Length N+5, edges inc two ghost on each end
+        #Rce_a = 0.5*(Ree_a[2:-1] + Ree_a[1:-2]) # Length N+2, centres inc one ghost on each end
+        Ree = Ree_a**alpha1
+        #Rce = Rce_a**alpha1
+
+        # Refining region
+        RR0 = Ree[(Ree<refine[0])][-1]
+        RR1 = Ree[(Ree>refine[1])][0]
+        RR0a = RR0**alpha
+        RR1a = RR1**alpha
+        NR = int((RR1a - RR0a) / dRa * refine[2])
+        dRRa = (RR1a - RR0a) / NR
+        RRee_a = RR0a + np.arange(1, NR, dtype='f8') * dRRa # Length NR-1, edges
+
+        # Combine into final grid
+        Ree_a = np.concatenate((Ree_a[(Ree<refine[0])], RRee_a, Ree_a[(Ree>refine[1])]))
+        Rce_a = 0.5*(Ree_a[2:-1] + Ree_a[1:-2]) # Length N+2, centres inc one ghost on each end
+        Ree = Ree_a**alpha1
+        Rce = Rce_a**alpha1
+
+        # Store
+        self._Re  = Ree[2:-2]   # Edges only in grid; length N+1
+        self._Rce = Rce         # All centres
+        self._Rc  = Rce[1:-1]   # Centres only in grid; length N
+        self._Ree = Ree         # All edges
+
     def _setup_aux(self):
         self._dRe  = np.diff(self._Re)
         self._dRc  = np.diff(self._Rc)

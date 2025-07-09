@@ -11,6 +11,7 @@
 import numpy as np
 from scipy import optimize
 from .constants import AU, sig_H2, m_H, yr, Msun
+from DiscEvolution.star import PhotoStar
 
 def LBP_profile(R,R_C,Sigma_C):
     """Defined for profile fitting"""
@@ -102,6 +103,11 @@ class AccretionDisc(object):
     def h(self):
         """Aspect ratio"""
         return self.H/self.R
+        
+    @property
+    def angleFlare_FUV(self):
+        """Flaring angle at FUV surface - assume h for rough order of magnitude"""
+        return self.h
 
     @property
     def H_edge(self):
@@ -198,11 +204,14 @@ class AccretionDisc(object):
     def set_surface_density(self, Sigma):
         self._Sigma[:] = Sigma
 
-    def update(self, dt):
+    def update(self, dt, vvisc=-0.):
         """Update the disc properties and age"""
 
         new_age = self._star.age + dt/(2*np.pi)
-        self._star.evolve(new_age)
+        if isinstance(self._star,PhotoStar):
+            self._star.evolve(new_age,self.Mdot(vvisc))
+        else:
+            self._star.evolve(new_age)
         self._eos.update(dt, self.Sigma, star=self._star, G_0=self.FUV)
 
     def interp(self, R, data):

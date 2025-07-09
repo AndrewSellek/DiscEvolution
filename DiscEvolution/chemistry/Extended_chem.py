@@ -164,7 +164,7 @@ class ChemExtended(object):
         fix_NH3    : Whether to fix the nitrogen abundance when recomputing the
                      molecular abundances
     """
-    def __init__(self, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0):
+    def __init__(self, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0, dt_scale=np.e):
         """Initialisation of reactions"""
         self._zetaFloor_SLRs = 7.6e-19 # Umebayashi & Nakano (2009)
         self._zetaCR = zetaCR
@@ -178,6 +178,7 @@ class ChemExtended(object):
         self._ice_rates     = []
         self._O2ice = O2ice # Is there initially O2 ice?
         self._instantO2hydrogenation = instantO2hydrogenation   # Does O2 instantly hydrogenatise?
+        self._dt_scale = dt_scale
 
         if ratesFile is not None:
             for row in open(ratesFile):
@@ -193,6 +194,9 @@ class ChemExtended(object):
                     alpha, beta, gamma = params
                     self._ice_reactions.append(reaction.replace("(s)",""))
                     self._ice_rates.append((float(alpha),float(beta),float(gamma)))
+                elif "(s)" in reaction and 'UV' in reaction:
+                    self._ice_reactions.append(reaction.replace("(s)",""))
+                    self._ice_rates.append(())
                 elif "(s)" in reaction:
                     spec1, spec2, Ebar = params
                     self._ice_reactions.append(reaction.replace("(s)",""))
@@ -221,33 +225,42 @@ class ChemExtended(object):
         return alpha * (T/300)**beta * gamma
         #return self._zetaCR * (T/300)**beta * gamma
 
-    def grain_surface(self, T, n_d, n_ice, spec1, spec2, Ebar):
+    def grain_surface(self, T, n_d, n_ice, spec1, spec2, Ebar, Nact=2):
         Nsites_tot = self._mu * self._etaNbind * n_d
-        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        Cgr = np.minimum(1, Nact**2*Nsites_tot**2/n_ice**2) / Nsites_tot
         nu1, nu2 = self._nu_pre['pure'][spec1], self._nu_pre['pure'][spec2]
         T1,  T2  = self._Tbind['pure'][spec1],  self._Tbind['pure'][spec2]
         Prob_spec1_spec2 = np.exp(-Ebar/T)
         return Cgr * Prob_spec1_spec2 * (nu1 * np.exp(-self._fdiff*T1/T) + nu2 * np.exp(-self._fdiff*T2/T))
 
-    def grain_surface_H(self, T, n_d, n_ice, Ebar = 860, mu=34/35):
+    def grain_surface_H(self, T, n_d, n_ice, Ebar = 860, mu=34/35, Nact=2):
         """Reaction rate with H on grain surfaces"""
         Nsites_tot = self._mu * self._etaNbind * n_d
-        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        Cgr = np.minimum(1, Nact**2*Nsites_tot**2/n_ice**2) / Nsites_tot
         nu_H  = 1.54e11     # ASW value in Minissale review
         Hbind = 450         # ASW value in Minissale review
         hop_H = np.maximum( np.exp(-self._fdiff*Hbind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*m_H*k_B*self._fdiff*Hbind )) )
         Prob_spec1_H = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
         return Cgr * Prob_spec1_H * nu_H * hop_H
         
-    def grain_surface_H2(self, T, n_d, n_ice, Ebar = 0, mu = 1):
+    def grain_surface_H2(self, T, n_d, n_ice, Ebar = 0, mu = 1, Nact=2):
         """Reaction rate with H2 on grain surfaces"""
         Nsites_tot = self._mu * self._etaNbind * n_d
-        Cgr = np.minimum(1, Nsites_tot**2/n_ice**2) / Nsites_tot
+        Cgr = np.minimum(1, Nact**2*Nsites_tot**2/n_ice**2) / Nsites_tot
         nu_H2  = 1.98e11    # ASW value in Minissale review
         H2bind = 371        # ASW value in Minissale review
         hop_H2 = np.maximum( np.exp(-self._fdiff*H2bind/T), np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*2.*m_H*k_B*self._fdiff*H2bind )) )
         Prob_spec1_H2 = np.exp(-2.*self._atunnel/hbar * np.sqrt(2.*mu*m_H*k_B*Ebar))
         return Cgr * Prob_spec1_H2 * nu_H2 * hop_H2
+        
+    def grain_photolysis(self, F_UV, NH2, d2g, grainSize):
+        sputterYield = 8e-4 # Alata+14/15, Anderson+17, Bosman+21
+        vol_per_C = 12*m_H/2.24
+        k_grain = 0.75*vol_per_C*sputterYield*F_UV/grainSize
+        tau_UV = 2.6e-21*(d2g[0]/0.01)*2*NH2/2 # Extinction in upper layers - assume small dust only
+        f_small = d2g[0]/d2g.sum(0) # Fraction in small dust
+        f_exposed = (1-np.exp(-tau_UV))/tau_UV
+        return k_grain*f_small*f_exposed # rate per grain * fraction of grains that are vertically mixed * fraction vertically above tau=1
         
     def get_weights_reactants_products(self, react):
         if '-->' in react:
@@ -334,7 +347,7 @@ class ChemExtended(object):
             
         return mol_abund
         
-    def convert_molecular_abundance(self, T, rho, Sigma, ice_abund, gas_abund, dt):
+    def convert_molecular_abundance(self, T, rho, Sigma, ice_abund, gas_abund, F_UV, d2g, dt):
         """Compute the fractions of species present given total abundances
 
         args:
@@ -387,9 +400,13 @@ class ChemExtended(object):
         for react, rate in zip(self._ice_reactions,self._ice_rates):
             reactants, weights_r, products, weights_p = self.get_weights_reactants_products(react)
             if 'CR' in reactants:
-                krate = self.UMISTformat_CR(T, zetaEff, *rate[1:])#*fsurf
+                krate = self.UMISTformat_CR(T, zetaEff, *rate[1:])
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
+            elif 'C-grain' in reactants:
+                krate = self.grain_photolysis(F_UV, Sigma*gas_abund['H2']/(gas_abund.mass('H2')*m_H), d2g, 0.1e-4)
+                weights_r.pop(reactants.index('UV'))
+                reactants.pop(reactants.index('UV'))
             elif "H" in reactants:
                 krate = self.grain_surface_H(T, n_d, n_ice, rate[-1], ice_abund.reduced_mass(reactants[0],reactants[1]))
             elif "OH" in reactants:
@@ -434,6 +451,9 @@ class ChemExtended(object):
                 if 'CR' in reactants:
                     weights_r.pop(reactants.index('CR'))
                     reactants.pop(reactants.index('CR'))
+                elif 'C-grain' in reactants:
+                    weights_r.pop(reactants.index('UV'))
+                    reactants.pop(reactants.index('UV'))
                 elif "H" in reactants:
                     weights_r.pop(reactants.index('H'))
                     reactants.pop(reactants.index('H'))
@@ -464,6 +484,9 @@ class ChemExtended(object):
             if 'CR' in reactants:
                 weights_r.pop(reactants.index('CR'))
                 reactants.pop(reactants.index('CR'))
+            elif 'C-grain' in reactants:
+                weights_r.pop(reactants.index('UV'))
+                reactants.pop(reactants.index('UV'))
             elif "H" in reactants:
                 weights_r[reactants.index('H')]/=2.0
                 reactants[reactants.index('H')]='H2'
@@ -528,18 +551,19 @@ class ChemExtended(object):
         tot_abund = ice_abund.copy()
         tot_abund += gas_abund.copy()
         self._mu = tot_abund.mu()
+        F_UV = disc.star.LFUV/(4*np.pi*(disc.R*AU)**2) * disc.angleFlare_FUV * 1e8/1.63e-3
         
-        dt = self.convert_molecular_abundance(T, rho, disc.Sigma_G, ice_abund, gas_abund, None)
+        dt = self.convert_molecular_abundance(T, rho, disc.Sigma_G, ice_abund, gas_abund, F_UV, disc.dust_frac, None)
                 
-        return dt/np.e  # Add a factor of e to avoid going exactly to 0 in non-empty cells
+        return dt/self._dt_scale  # Add a factor of e to avoid going exactly to 0 in non-empty cells
         
 ###############################################################################
 # Combined Models
 ###############################################################################
 class EquilibriumChemExtended(ChemExtended, EquilibriumChem):
-    def __init__(self, fix_ratios=True, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0, **kwargs):
+    def __init__(self, fix_ratios=True, ratesFile=None, zetaCR=1.30e-17, barrier=1.0e-8, O2ice=True, instantO2hydrogenation=False, scaleCRattenuation=0, dt_scale=np.e, **kwargs):
         #assert fix_ratios,"For Extended chem, no option to reset implemented, cannot run a model with fix_ratios=False"
-        ChemExtended.__init__(self, ratesFile, zetaCR, barrier, O2ice, instantO2hydrogenation, scaleCRattenuation)
+        ChemExtended.__init__(self, ratesFile, zetaCR, barrier, O2ice, instantO2hydrogenation, scaleCRattenuation, dt_scale)
         EquilibriumChem.__init__(self, fix_ratios=fix_ratios, **kwargs)
 
 class TimeDepChemExtended(ChemExtended, TimeDependentChem):

@@ -116,7 +116,12 @@ def setup_disc(model):
 
     # Setup the grid
     p = model['grid']
-    grid = Grid(p['R0'], p['R1'], p['N'], spacing=p['spacing'])
+    refine=None
+    if p['spacing']=='naturalRefine' and model['perturbation']['Type']=="Gaussian":
+        refine = (model['perturbation']['Radius']*0.7,model['perturbation']['Radius']*1.3,2)
+    elif p['spacing']=='naturalRefine':
+        p['spacing']='natural'
+    grid = Grid(p['R0'], p['R1'], p['N'], spacing=p['spacing'], refine=refine)
 
     # Setup the star with photoionizing luminosity if provided and non-zero
     p = model['star']
@@ -126,7 +131,7 @@ def setup_disc(model):
         elif model['euv']['Phi'] > 0:
             star = PhotoStar(LX=0, Phi=model['euv']['Phi'], M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
         else:
-            star = SimpleStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
+            star = PhotoStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
     except KeyError:
         star = SimpleStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
 
@@ -249,22 +254,22 @@ def setup_disc(model):
             if model['chemistry']['type'] == 'krome':
                 raise NotImplementedError("Haven't configured krome chemistry in this version")
             else:
-                disc.chem = setup_init_abund_simple(model, disc)
+                disc.chem = setup_init_abund_simple(model, disc, grid.Ncells)
                 disc.update_ices(disc.chem.ice)
 
     return disc
 
 ###
-def setup_init_abund_simple(model, disc):
+def setup_init_abund_simple(model, disc, N):
     # Define abundances
     if model['chemistry']['type']=="Kalyaan":
-        X_atom = SimpleH2OAtomAbund(model['grid']['N'])
+        X_atom = SimpleH2OAtomAbund(N)
         X_atom.set_Kalyaan_abundances()
     elif model['chemistry']['type']=="Extended" or model['chemistry']['type']=="MINDS" or model['chemistry']['type']=="SimpleConversion" or model['chemistry']['type']=="C2H2form":
-        X_atom = SimpleAtomAbund(model['grid']['N'])
+        X_atom = SimpleAtomAbund(N)
         X_atom.set_adopted_abundances()
     else:
-        X_atom = SimpleCNOAtomAbund(model['grid']['N'])
+        X_atom = SimpleCNOAtomAbund(N)
         X_atom.set_solar_abundances()    
 
     # Put into a chemical model
@@ -322,7 +327,7 @@ def get_simple_chemistry_model(model):
     rateKwargs = {}
     if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
         ratesFile = model['chemistry']['ratesFile']
-        rateKwargs = {'zetaCR': 1.30e-17, 'barrier': 1e-8, 'O2ice': True, 'instantO2hydrogenation': False, 'scaleCRattenuation': 0}
+        rateKwargs = {'zetaCR': 1.30e-17, 'barrier': 1e-8, 'O2ice': True, 'instantO2hydrogenation': False, 'scaleCRattenuation': 0, 'dt_scale': np.e}
         for paramName in rateKwargs.keys():
             if paramName in model['chemistry'].keys():
                 rateKwargs[paramName] = model['chemistry'][paramName]
