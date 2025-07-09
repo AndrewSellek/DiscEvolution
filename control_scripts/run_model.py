@@ -474,14 +474,18 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
                 photomodel = model['x-ray']['model']
             except KeyError:
                 photomodel = 'Picogna'
+            try:
+                forceMdot = model['x-ray']['Mdot']
+            except KeyError:
+                forceMdot = None
             InnerHole = internal_photo_type.startswith('InnerHole')
             if InnerHole:
                 if photomodel=='Sellek':
-                    internal_photo = XrayDiscSellek24(disc,Type='InnerHole',R_hole=R_hole)
+                    internal_photo = XrayDiscSellek24(disc,Type='InnerHole',R_hole=R_hole,Mdot=forceMdot)
                 elif photomodel=='Picogna21':
                     internal_photo = XrayDiscPicogna21(disc,Type='InnerHole',R_hole=R_hole)
                 elif photomodel=='Picogna':
-                    internal_photo = XrayDiscPicogna(disc,Type='InnerHole',R_hole=R_hole)
+                    internal_photo = XrayDiscPicogna(disc,Type='InnerHole',R_hole=R_hole,Mdot=forceMdot)
                 elif photomodel=='Owen':
                     internal_photo = XrayDiscOwen(disc,Type='InnerHole',R_hole=R_hole)
                 else:
@@ -489,11 +493,11 @@ def setup_model(model, disc, history, start_time=0, internal_photo_type="Primord
                     internal_photo = None
             else:
                 if photomodel=='Sellek':
-                    internal_photo = XrayDiscSellek24(disc)
+                    internal_photo = XrayDiscSellek24(disc,Mdot=forceMdot)
                 elif photomodel=='Picogna21':
                     internal_photo = XrayDiscPicogna21(disc)
                 elif photomodel=='Picogna':
-                    internal_photo = XrayDiscPicogna(disc)
+                    internal_photo = XrayDiscPicogna(disc,Mdot=forceMdot)
                 elif photomodel=='Owen':
                     internal_photo = XrayDiscOwen(disc)
                 else:
