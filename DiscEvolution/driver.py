@@ -231,7 +231,7 @@ class DiscEvolutionDriver(object):
     def history(self):
         return self._history
 
-    def dump_ASCII(self, filename):
+    def dump_ASCII(self, filename, regrid=None, atom=False):
         """Write the current state to a file, including header information"""
 
         # Put together a header containing information about the physics
@@ -253,7 +253,10 @@ class DiscEvolutionDriver(object):
             head += self._collapse.ASCII_header() + '\n'
 
         # Write it all to disc
-        io.dump_ASCII(filename, self._disc, self.t, head)
+        if regrid is not None:
+            io.dump_ASCII_regrid(filename, self._disc, self.t, head, regrid, atom=atom)
+        else:
+            io.dump_ASCII(filename, self._disc, self.t, head)
 
     def dump_hdf5(self, filename):
         """Write the current state in HDF5 format, with header information"""

@@ -11,9 +11,11 @@ import collections
 import numpy as np
 import re
 import os
+from scipy.interpolate import CubicSpline
 
 from . import constants
-from .chemistry import create_abundances, MolecularIceAbund
+from .chemistry import create_abundances, MolecularIceAbund, SimpleAtomAbund
+from .dust import DustGrowthTwoPop
 
 __all__ = [ "Event_Controller", "dump_ASCII", "dump_hdf5", "DiscReader" ]
 ###############################################################################
@@ -27,6 +29,7 @@ class Event_Controller(object):
     where the values passed must be iterable lists of times.
     """
     def __init__(self, **events):
+        self._regrid = []
         
         self._events  = {}
         self._event_number = {}
@@ -110,6 +113,14 @@ class Event_Controller(object):
                 return False
         else:
             return True
+            
+    def set_regrid(self, regrid):
+        if isinstance(regrid,list):
+            self._regrid = regrid
+        elif '.npy' in regrid:
+            self._regrid = np.load(regrid)[:,0]
+        else:
+            self._regrid = []
 
 
 ################################################################################
@@ -183,6 +194,93 @@ def dump_ASCII(filename, disc, time, header=None):
                     f.write(' {}'.format(chem.gas[k][i]))
                 for k in chem.ice:
                     f.write(' {}'.format(chem.ice[k][i]))
+            f.write('\n')
+            
+def dump_ASCII_regrid(filename, disc, time, header=None, regrid=[1], atom=False):
+    """Write an ASCII dump of the disc data.
+
+    args:
+        filename : string
+            Name of the new dump file
+        disc     : disc object
+            Disc that will be saved to disc.
+        time     : float 
+            Current time (in Omega0)
+        header   : string, list of strings, or None
+            Additional header data to write 
+    """
+    if header is None:
+        header = []
+    if isinstance(header, string_types):
+        header = [header,]
+
+    # Construct the header
+    head = disc.ASCII_header() + '\n'
+    for h in header:
+        head += h
+        if not h.endswith('\n'):
+            head += '\n'
+
+    with open(filename, 'w') as f:
+        f.write(head)
+        f.write('# time: {}yr\n'.format(time / constants.yr))
+
+        # Construct the list of variables that we are going to print
+        Ncell = disc.Ncells
+        Nnew  = len(regrid)
+        
+        Ndust = 0
+        try:
+            Ndust = disc.dust_frac.shape[0]
+        except AttributeError:
+            pass
+
+        head = '# R Sigma T'
+        if isinstance(disc,DustGrowthTwoPop):
+            head += ' flarge g2d chilarge'
+        chem = None
+        try:
+            chem = disc.chem
+            totalchem = chem.ice.copy()
+            totalchem += chem.gas.copy()
+            atommassfrac = totalchem.atomic_abundance()
+            muH = np.zeros_like(disc.R)
+            for el in atommassfrac:
+                muH+=atommassfrac[el]
+            muH/=atommassfrac['H']
+            abundanceTemplate = SimpleAtomAbund(len(disc.R))
+            if atom:
+                atomabun = {}
+                for k in atommassfrac:
+                    atomabun[k] = CubicSpline(disc.R, atommassfrac[k]/atommassfrac['H']/abundanceTemplate.mass(k))
+                    head += ' {}'.format(k)
+            else:
+                molabun = {}
+                for k in totalchem:
+                    molabun[k] = CubicSpline(disc.R, totalchem[k]*muH/chem.gas.mass(k))
+                    head += ' {}'.format(k)
+        except AttributeError:
+            pass
+
+        f.write(head+'\n')
+        
+        R, Sig, T = disc.R, disc.Sigma, disc.T
+        Signew = CubicSpline(disc.R, disc.Sigma)
+        Tnew   = CubicSpline(disc.R, disc.T)
+        
+        flarge   = CubicSpline(disc.R, np.fmax(disc.dust_frac[1,:]/disc.integ_dust_frac,0.0))
+        g2d      = CubicSpline(disc.R, 1/(disc.integ_dust_frac+1e-300))
+        chilarge = CubicSpline(disc.R, disc.Hp[1,:]/disc.H)
+
+        for i in range(Nnew):
+            f.write('{} {} {}'.format(regrid[i], Signew(regrid[i]), Tnew(regrid[i])))
+            f.write(' {} {} {}'.format(flarge(regrid[i]), g2d(regrid[i]), chilarge(regrid[i])))
+            if chem and atom:
+                for k in atommassfrac:
+                    f.write(' {}'.format(atomabun[k](regrid[i])))
+            elif chem and not atom:
+                for k in totalchem:
+                    f.write(' {}'.format(molabun[k](regrid[i])))
             f.write('\n')
 
 ################################################################################

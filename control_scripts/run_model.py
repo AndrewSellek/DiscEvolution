@@ -598,7 +598,9 @@ def setup_output(model):
         else:
             history = []      
 
-    EC = Event_Controller(save=output_times, plot=plot, history=history)
+    EC = Event_Controller(save=output_times, plot=plot, history=history)        
+    if 'regrid' in out.keys():
+        EC.set_regrid(regrid=out['regrid'])
     
     # Base string for output:
     mkdir_p(out['directory'])
@@ -740,6 +742,10 @@ def run(model, io, base_name, all_in, restart, verbose=True, n_print=1000, end_l
                 print ("Making save at {} yr".format(model.t/yr))
             if base_name.endswith('.h5'):
                     model.dump_hdf5( base_name.format(save_no))
+            elif len(io._regrid)>0:
+                    model.dump_ASCII(base_name.format(save_no))
+                    model.dump_ASCII(base_name.replace('.dat','_regrid.dat').format(save_no), regrid=io._regrid)
+                    model.dump_ASCII(base_name.replace('.dat','_regrid_atom.dat').format(save_no), regrid=io._regrid, atom=True)
             else:
                     model.dump_ASCII(base_name.format(save_no))
             save_no+=1
