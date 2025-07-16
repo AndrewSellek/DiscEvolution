@@ -237,7 +237,7 @@ def dump_ASCII_regrid(filename, disc, time, header=None, regrid=[1], atom=False)
 
         head = '# R Sigma T'
         if isinstance(disc,DustGrowthTwoPop):
-            head += ' flarge g2d chilarge'
+            head += ' f_large g2d chi_large'
         chem = None
         try:
             chem = disc.chem
@@ -249,16 +249,22 @@ def dump_ASCII_regrid(filename, disc, time, header=None, regrid=[1], atom=False)
                 muH+=atommassfrac[el]
             muH/=atommassfrac['H']
             abundanceTemplate = SimpleAtomAbund(len(disc.R))
+            molabun = {}
+            atomabun = {}
+            volabun  = {}
+            for k in totalchem:
+                molabun[k] = CubicSpline(disc.R, totalchem[k]*muH/chem.gas.mass(k))
+                head += ' {}/H'.format(k)
             if atom:
-                atomabun = {}
                 for k in atommassfrac:
                     atomabun[k] = CubicSpline(disc.R, atommassfrac[k]/atommassfrac['H']/abundanceTemplate.mass(k))
-                    head += ' {}'.format(k)
-            else:
-                molabun = {}
+                    volabun[k]  = CubicSpline(disc.R, atommassfrac[k]/atommassfrac['H']/abundanceTemplate.mass(k))
+                    head += ' {}/H {}/H_vol'.format(k,k)
+                # Remove refractories from volatile totals
                 for k in totalchem:
-                    molabun[k] = CubicSpline(disc.R, totalchem[k]*muH/chem.gas.mass(k))
-                    head += ' {}'.format(k)
+                    if 'grain' in k:
+                        for el, noel in totalchem._n_spec[k].items():
+                            volabun[el] = CubicSpline(disc.R, volabun[el](disc.R)-noel*molabun[k](disc.R))
         except AttributeError:
             pass
 
@@ -277,8 +283,8 @@ def dump_ASCII_regrid(filename, disc, time, header=None, regrid=[1], atom=False)
             f.write(' {} {} {}'.format(flarge(regrid[i]), g2d(regrid[i]), chilarge(regrid[i])))
             if chem and atom:
                 for k in atommassfrac:
-                    f.write(' {}'.format(atomabun[k](regrid[i])))
-            elif chem and not atom:
+                    f.write(' {} {}'.format(atomabun[k](regrid[i]),volabun[k](regrid[i])))
+            elif chem:
                 for k in totalchem:
                     f.write(' {}'.format(molabun[k](regrid[i])))
             f.write('\n')
