@@ -243,6 +243,7 @@ def dump_ASCII_regrid(filename, disc, time, header=None, regrid=[1], atom=False)
             chem = disc.chem
             totalchem = chem.ice.copy()
             totalchem += chem.gas.copy()
+            gasmassfrac = chem.gas.atomic_abundance()
             atommassfrac = totalchem.atomic_abundance()
             muH = np.zeros_like(disc.R)
             for el in atommassfrac:
@@ -250,16 +251,19 @@ def dump_ASCII_regrid(filename, disc, time, header=None, regrid=[1], atom=False)
             muH/=atommassfrac['H']
             abundanceTemplate = SimpleAtomAbund(len(disc.R))
             molabun = {}
-            atomabun = {}
-            volabun  = {}
+            atmabun = {}
+            volabun = {}
+            gasabun = {}
             for k in totalchem:
                 molabun[k] = CubicSpline(disc.R, totalchem[k]*muH/chem.gas.mass(k))
-                head += ' {}/H'.format(k)
+                if not atom:
+                    head += ' {}/H'.format(k)
             if atom:
                 for k in atommassfrac:
-                    atomabun[k] = CubicSpline(disc.R, atommassfrac[k]/atommassfrac['H']/abundanceTemplate.mass(k))
-                    volabun[k]  = CubicSpline(disc.R, atommassfrac[k]/atommassfrac['H']/abundanceTemplate.mass(k))
-                    head += ' {}/H {}/H_vol'.format(k,k)
+                    atmabun[k] = CubicSpline(disc.R, atommassfrac[k]/atommassfrac['H']/abundanceTemplate.mass(k))
+                    volabun[k] = CubicSpline(disc.R, atommassfrac[k]/atommassfrac['H']/abundanceTemplate.mass(k))
+                    gasabun[k] = CubicSpline(disc.R, gasmassfrac[k]/gasmassfrac['H']/abundanceTemplate.mass(k))
+                    head += ' {}/H {}/H_vol {}/H_gas'.format(k,k,k)
                 # Remove refractories from volatile totals
                 for k in totalchem:
                     if 'grain' in k:
@@ -283,7 +287,7 @@ def dump_ASCII_regrid(filename, disc, time, header=None, regrid=[1], atom=False)
             f.write(' {} {} {}'.format(flarge(regrid[i]), g2d(regrid[i]), chilarge(regrid[i])))
             if chem and atom:
                 for k in atommassfrac:
-                    f.write(' {} {}'.format(atomabun[k](regrid[i]),volabun[k](regrid[i])))
+                    f.write(' {} {} {}'.format(atmabun[k](regrid[i]),volabun[k](regrid[i]),gasabun[k](regrid[i])))
             elif chem:
                 for k in totalchem:
                     f.write(' {}'.format(molabun[k](regrid[i])))
