@@ -50,7 +50,8 @@
 "plot_times" : [0],
 "plot_name" : "disc",
 "history" : true,
-"history_times": [0]
+"history_times": [0],
+"regrid" : "None"
 },
 
 "fuv" : {
@@ -87,7 +88,10 @@
 "CR_desorb" : false,
 "UV_desorb" : false,
 "X_desorb"  : false,
-"ratesFile" : false
+"ratesFile" : false,
+"zetaCR" : 1.3000000000000002e-18,
+"scaleCRattenuation" : 1.0,
+"instantO2hydrogenation" : true
 },
 
 "perturbation" : {
@@ -95,7 +99,10 @@
 "Amplitude" : 0.0,
 "Radius" : 0.0,
 "Width"  : 0.0,
-"Initial" : false
+"Initial" : false,
+"Growth Scaling" : 0.67,
+"Growth Timescale": 1e4,
+"Growth Endtime": 1000000.0
 }
 
 }
