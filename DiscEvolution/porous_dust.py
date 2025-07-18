@@ -121,11 +121,14 @@ class DustyDisc(AccretionDisc):
 
         return self.H * np.sqrt(eta * a / (a + St))
     
-    def update(self, dt):
+    def update(self, dt, vvisc=-0.):
         """Update the disc properites and age"""
 
         new_age = self._star.age + dt/(2*np.pi)
-        self._star.evolve(new_age)
+        if isinstance(self._star,PhotoStar):
+            self._star.evolve(new_age,self.Mdot(vvisc))
+        else:
+            self._star.evolve(new_age)
         self._eos.update(dt, self.Sigma,
                          amax=self.grain_size[-1], star=self._star)
     

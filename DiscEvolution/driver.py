@@ -161,8 +161,11 @@ class DiscEvolutionDriver(object):
             f_small[(eps==0.0)] = 0.0
             grain_size = disc.grain_size[-1]
             T = disc.T
-            LFUV_G0 = disc.star.LFUV/(4*np.pi*(disc.R*AU)**2) * disc.angleFlare_FUV/1.63e-3 + disc.FUV
-            F_UV = LFUV_G0 * 1e8
+            if hasattr(disc.star,'LFUV'):
+                LFUV_G0 = disc.star.LFUV/(4*np.pi*(disc.R*AU)**2) * disc.angleFlare_FUV/1.63e-3 + disc.FUV
+                F_UV = LFUV_G0 * 1e8
+            else:
+                F_UV = 0
 
             self._chemistry.update(dt, T, rho, eps, f_small, disc.R, disc.Sigma_G, disc.chem, F_UV, grain_size=grain_size)
 

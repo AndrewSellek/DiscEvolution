@@ -84,7 +84,7 @@ def setup_disc(model):
 
     # Setup the star
     p = model['star']
-    star = SimpleStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
+    star = PhotoStar(M=p['mass'], R=p['radius'], T_eff=p['T_eff'])
 
     # Setup the equation of state
     p = model['eos']
@@ -217,6 +217,8 @@ def get_simple_chemistry_model(model):
     # Reactions  
     ratesFile = None
     rateKwargs = {}
+    nonThermal = False
+    nonThermal_dict = {}
     if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
         ratesFile = model['chemistry']['ratesFile']
         rateKwargs = {'zetaCR': 1.30e-17, 'barrier': 1e-8, 'O2ice': True, 'instantO2hydrogenation': False, 'scaleCRattenuation': 0, 'dt_scale': np.e}
@@ -227,7 +229,7 @@ def get_simple_chemistry_model(model):
     if chem_type == 'Extended' or chem_type == 'MINDS':
         chemistry = EquilibriumChemExtended(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
     elif chem_type == 'SimpleConversion' or chem_type == 'C2H2form':
-        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, 
+        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, **rateKwargs) 
     else:
         raise NotImplementedError("Not implemented in this simple setup, use run_model.py instead")
 
