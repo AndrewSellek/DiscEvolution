@@ -215,12 +215,21 @@ def get_simple_chemistry_model(model):
         pass
 
     # Reactions  
+    ratesFile = None
+    rateKwargs = {}
     if 'ratesFile' in model['chemistry'].keys() and model['chemistry']['ratesFile']:
         ratesFile = model['chemistry']['ratesFile']
-    else:
-        ratesFile = None
+        rateKwargs = {'zetaCR': 1.30e-17, 'barrier': 1e-8, 'O2ice': True, 'instantO2hydrogenation': False, 'scaleCRattenuation': 0, 'dt_scale': np.e}
+        for paramName in rateKwargs.keys():
+            if paramName in model['chemistry'].keys():
+                rateKwargs[paramName] = model['chemistry'][paramName]
 
-    chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, ratesFile=ratesFile, zetaCR=zetaCR, barrier=barrier)
+    if chem_type == 'Extended' or chem_type == 'MINDS':
+        chemistry = EquilibriumChemExtended(fix_ratios=True,   a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict)
+    elif chem_type == 'SimpleConversion' or chem_type == 'C2H2form':
+        chemistry = EquilibriumChemExtended(fix_ratios=False,  a=grain_size, nonThermal=nonThermal, nonThermal_dict=nonThermal_dict, ratesFile=ratesFile, 
+    else:
+        raise NotImplementedError("Not implemented in this simple setup, use run_model.py instead")
 
     return chemistry
 
