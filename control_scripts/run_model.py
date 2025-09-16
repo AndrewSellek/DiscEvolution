@@ -231,15 +231,12 @@ def setup_disc(model):
     # If non-zero dust, set up a two population model, else use a simple accretion disc
     if model['disc']['d2g'] > 0:
         # If model dust parameters not specified, resort to default
-        if 'alpha_t' in model['dust'].keys():
-            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field,
-                    rho_s=model['dust']['density'], Sc=model['disc']['Schmidt'], feedback=feedback, uf_0=model['dust']['dust_frag_v'], uf_ice=model['dust']['ice_frag_v'], f_grow=model['dust']['f_grow'], distribution_slope=model['dust']['p'], alpha_t=model['dust']['alpha_t'], alpha_z=model['dust']['alpha_z'])
-        elif 'f_grow' in model['dust'].keys():
-            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field,
-                    rho_s=model['dust']['density'], Sc=model['disc']['Schmidt'], feedback=feedback, uf_0=model['dust']['dust_frag_v'], uf_ice=model['dust']['ice_frag_v'], f_grow=model['dust']['f_grow'], distribution_slope=model['dust']['p'])
-        else:
-            disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field, 
-                    Sc=model['disc']['Schmidt'], feedback=feedback, uf_0=model['dust']['dust_frag_v'], uf_ice=model['dust']['ice_frag_v'])
+        dustKwargs = {'alpha_t': None, 'alpha_z': None, 'f_grow': 1.0, 'distribution_slope': 3.5, 'a0': 1e-5, 'amin': 1e-5}
+        for paramName in dustKwargs.keys():
+            if paramName in model['dust'].keys():
+                dustKwargs[paramName] = model['dust'][paramName]
+        disc = DustGrowthTwoPop(grid, star, eos, p['d2g'], Sigma=Sigma, FUV=FUV_field,
+                    Sc=model['disc']['Schmidt'], feedback=feedback, uf_0=model['dust']['dust_frag_v'], uf_ice=model['dust']['ice_frag_v'], **dustKwargs)
     else:
         disc = AccretionDisc(grid, star, eos, Sigma=Sigma, FUV=FUV_field)
 
